@@ -9,7 +9,7 @@ import Footer from '/src/components/Footer.jsx';
 import Login from '/src/components/Login.jsx';
 import getAsyncEventData from '/src/utilities/getEventsList.jsx';
 import loginToAPI from '/src/utilities/login.jsx';
-{ /* import './App.css' */ }
+import '/src/App.css';
 
 
 function App() {
