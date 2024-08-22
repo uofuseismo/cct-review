@@ -1,6 +1,6 @@
 import React from 'react';
 import CCTReview from '/src/components/CCTReview.jsx';
-import { Box, Flex, HStack, VStack, Container } from '@chakra-ui/react';
+import { Alert, AlertDescription, AlertIcon, AlertTitle } from '@chakra-ui/react'
 import EventTable from '/src/components/EventTable.jsx';
 import SpectraFit from '/src/components/SpectraFit.jsx';
 import TableFit from '/src/components/TableFit.jsx';
@@ -9,10 +9,12 @@ import Footer from '/src/components/Footer.jsx';
 import Login from '/src/components/Login.jsx';
 import getAsyncEventData from '/src/utilities/getEventsList.jsx';
 import loginToAPI from '/src/utilities/login.jsx';
+import { jwtDecode } from 'jwt-decode';
 import '/src/App.css';
 
 
 function App() {
+  var [tokenExpiration, setTokenExpiration] = React.useState(0);
   var [authenticated, setAuthenticated] = React.useState(false);
   var [userCredentials, setUserCredentials]
     = React.useState( {permissions: 'read-write',
@@ -34,9 +36,7 @@ function App() {
   const handleUserCredentials = ( jsonResponse ) => {
     var newUserCredentials = structuredClone(userCredentials);
     if (jsonResponse) {
-      console.log('------------------------');
-      console.log(jsonResponse);
-      console.log('------------------------');
+      console.debug(jsonResponse);
       if (jsonResponse.status === "success") {
         if (jsonResponse.jsonWebToken) {
           newUserCredentials.jsonWebToken = jsonResponse.jsonWebToken;
@@ -53,25 +53,44 @@ function App() {
         setUserCredentials(newUserCredentials);
         console.log(userCredentials);
         setAuthenticated(true);
+        return true;
       }
       else {
         console.log(`Validation not successful`);
         if (authenticated) {
           setAuthenticated(false);
         }
+        return false;
       }
     }
+    return false;
   };
 
   const handleLogin = ( userValue, passwordValue ) => {
     const newUserCredentials = {...userCredentials, user: userValue, password: passwordValue};
-    loginToAPI( userValue, passwordValue, handleUserCredentials );
-    { /* console.log(JSON.stringify(result)); */ }
-    { /* setAuthenticated(false); */ }
+    var loggedIn = loginToAPI( userValue, passwordValue, handleUserCredentials );
+    if (loggedIn) {
+      return (
+        <React.Fragment>
+        </React.Fragment>
+      );
+    }    
+    else {
+      return (
+        <React.Fragment>
+          <Alert status='error'>
+            <AlertIcon />
+            <AlertTitle>Login failed!</AlertTitle>
+            <AlertDescription>Could not validate your credentials.</AlertDescription>
+          </Alert>
+        </React.Fragment>
+      );
+    }
   }
 
   const handleLogout = () => {
      setAuthenticated(false);
+     setTokenExpiration(0);
   }
 
   const handleUpdateAuthentication = (newAuthentication) => {

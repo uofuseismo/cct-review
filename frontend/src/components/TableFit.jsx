@@ -86,7 +86,7 @@ function FitBadges( {likelyPoorlyConstrained, inconsistentMagnitude} ) {
   );
 }
 
-function TableFit( {jsonWebToken, schema, canSubmit, eventData} ) {
+function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
   var [ dataIsRequested, setDataIsRequested ] = React.useState( false ); 
   var eventIdentifier = null;
   var mwCodaMagnitude = null;
@@ -131,7 +131,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData} ) {
   const downloadJSON = () => {
      if ( {eventIdentifier} ) {
        setDataIsRequested(true);
-       getHeavyWeightDataFromAPI( schema, jsonWebToken, eventIdentifier ).then( (jsonData) => {
+       getHeavyWeightDataFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
          setDataIsRequested(false);
          // File object
          if ( jsonData !== null ) {

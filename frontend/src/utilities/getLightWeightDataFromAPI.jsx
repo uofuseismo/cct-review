@@ -1,8 +1,19 @@
+import { jwtDecode } from 'jwt-decode';
 import getEndpoint from '/src/utilities/getEndpoint';
 
-function getLightWeightEventDataFromAPI( schema, jsonToken ) {
-  console.log(schema);
-  console.log(typeof(jsonToken));
+function getLightWeightEventDataFromAPI( schema, jsonToken, handleLogout ) {
+  { /* console.log(schema); */ }
+  { /* console.log(typeof(jsonToken)); */ }
+  const decodedToken = jwtDecode(jsonToken);
+  if (decodedToken.exp) {
+    var now = new Date()/1000;
+    if (now > decodedToken.exp) {
+      console.warn("Token expired");
+      handleLogout();
+    }
+  }
+
+  
   const apiEndpoint = getEndpoint();
 
   const authorizationHeader = `Bearer ${jsonToken}`;

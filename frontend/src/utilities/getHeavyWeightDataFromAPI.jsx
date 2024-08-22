@@ -1,9 +1,18 @@
 import React from 'react';
-import axios from 'axios';
 import getEndpoint from '/src/utilities/getEndpoint';
+import { jwtDecode } from 'jwt-decode';
 
-function getHeavyWeightDataFromAPI( schema, jsonToken, eventIdentifier ) {
+function getHeavyWeightDataFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   const apiEndpoint = getEndpoint();
+
+  const decodedToken = jwtDecode(jsonToken);
+  if (decodedToken.exp) {
+    var now = new Date()/1000;
+    if (now > decodedToken.exp) {
+      console.warn("Token expired");
+      handleLogout();
+    }   
+  }
 
   const authorizationHeader = `Bearer ${jsonToken}`;
 

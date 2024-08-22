@@ -46,7 +46,7 @@ function CCTReview( { userCredentials, onLogout } ) {
   React.useEffect(() => {
     { /* getAsyncEventData().then((result) => { */ }
     { /* console.log(`CCT loaded ${result.events.length} events`); */ }
-    getLightWeightEventDataFromAPI( settings.schema, jsonWebToken ).then( (result) => {
+    getLightWeightEventDataFromAPI( settings.schema, jsonWebToken, onLogout ).then( (result) => {
     { /* If this is a reload then try to get back to our current event */ }
     console.log(`CCT returned ${result.events.length} events from API`);
     setEvents(result.events);
@@ -94,6 +94,7 @@ function CCTReview( { userCredentials, onLogout } ) {
                schema={settings.schema}
                canSubmit={canSubmit}
                eventData={graphData}
+               onLogout={onLogout}
               />
             </Box>
           </Flex>
