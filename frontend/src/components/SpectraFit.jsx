@@ -7,7 +7,6 @@ function SpectraFit( props ) {
   var upperBound = null;
   var measurements = [];
   if ( props.data != null ) {
-    console.debug("SpectraFit: Props are not null");
     const spectralFit = props.data.spectralFit;
     fitLine = [];
     for (var i = 0; i < spectralFit.fit.frequencies.length; i++) {
@@ -25,7 +24,6 @@ function SpectraFit( props ) {
                         y: spectralFit['bruneUpperBound-2'].values[i]} );
     }
     const stationMeasurements = props.data.stationMeasurements;
-    console.debug(stationMeasurements);
     for (var i = 0; i < stationMeasurements.length; i++) {
       var points = [];
       for (var j = 0; j < stationMeasurements[i].measurements.length; j++) {

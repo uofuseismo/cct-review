@@ -32,7 +32,7 @@ function EventTable( { events, onUpdateEventIdentifier } ) {
                    {row.eventIdentifier}
                  </Button>
                </Td>
-               <Td>{row.authoritativeMagnitude} M{row.authoritativeMagnitudeType}</Td>
+               <Td>{row.authoritativeMagnitude.toFixed(2)} M{row.authoritativeMagnitudeType}</Td>
                <Td>{row.originTime}</Td>
                <Td>{row.latitude.toFixed(4)}</Td>
                <Td>{row.longitude.toFixed(4)}</Td>

@@ -1,0 +1,25 @@
+# Logs
+cct-frontend/logs
+cct-frontend/*.log
+cct-frontend/npm-debug.log*
+cct-frontend/yarn-debug.log*
+cct-frontend/yarn-error.log*
+cct-frontend/pnpm-debug.log*
+cct-frontend/lerna-debug.log*
+
+cct-frontend/node_modules
+cct-frontend/dist
+cct-frontend/dist-ssr
+cct-frontend/*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
