@@ -7,7 +7,6 @@ import TableFit from '/src/components/TableFit.jsx';
 import Header from '/src/components/Header.jsx';
 import Footer from '/src/components/Footer.jsx';
 import Login from '/src/components/Login.jsx';
-import getAsyncEventData from '/src/utilities/getEventsList.jsx';
 import loginToAPI from '/src/utilities/login.jsx';
 import { jwtDecode } from 'jwt-decode';
 import '/src/App.css';
