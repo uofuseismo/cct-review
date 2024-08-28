@@ -5,6 +5,7 @@ import { encode as base64_encode } from 'base-64';
 
 export default function loginToAPI( user, password, onUpdateUserCredentials ) { 
   const apiEndpoint = getEndpoint();
+  console.debug(`Will login at endpoint ${apiEndpoint}`);
 
   const authorizationHeader = 'Basic ' + base64_encode(`${user}:${password}`);
   console.debug(authorizationHeader);

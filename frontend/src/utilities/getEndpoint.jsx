@@ -1,5 +1,13 @@
 export default function getEndpoint() {
-  const apiUrl = import.meta.env.NODE_ENV === 'production' ? import.meta.env.REACT_APP_PROD_API_URL : import.meta.env.REACT_APP_DEV_API_URL;
-  return apiUrl;
+  if (import.meta.env.MODE === 'production') {
+    console.log("hey");
+    console.log(import.meta.env.VITE_CCT_API_PRODUCTION_URL);
+    return import.meta.env.VITE_CCT_API_PRODUCTION_URL;
+  }
+  else {
+    return import.meta.env.VITE_CCT_API_DEVELOPMENT_URL;
+  }
+  console.warn("Unhandled mode; returning localhost URL");
+  return "http://127.0.0.1:8080";
 };
 
