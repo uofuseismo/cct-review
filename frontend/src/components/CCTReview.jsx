@@ -5,7 +5,7 @@ import SpectraFit from '/src/components/SpectraFit.jsx';
 import TableFit from '/src/components/TableFit.jsx';
 import Header from '/src/components/Header.jsx';
 import Footer from '/src/components/Footer.jsx';
-import getAsyncEventData from '/src/utilities/getEventsList.jsx';
+{ /* import getAsyncEventData from '/src/utilities/getEventsList.jsx'; */ }
 import getLightWeightEventDataFromAPI from '/src/utilities/getLightWeightDataFromAPI.jsx';
 { /* import getLightWeightEventDataFromAPI from '/src/utilities/getEventsListFromServer.jsx'; */ }
 { /* import getAsynchEventDataFromAPI from '/src/utilities/getEventsListFromServer.jsx'; */ }

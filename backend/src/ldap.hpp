@@ -4,7 +4,10 @@
 #include <memory>
 namespace CCTService
 {
-/// @brief Defines an LDAP authenticator for UUSS.
+/// @class LDAP "ldap.hpp"
+/// @brief Defines a Lightweight Directory Access Protocol (LDAP)
+///        authenticator for UUSS.
+/// @copyright Ben Baker (University of Utah) distributed under the MIT license.
 class LDAP : public IAuthenticator
 {
 public:
@@ -13,7 +16,7 @@ public:
     {   
         One = 1,
         Two = 2,
-        Three = 3 
+        Three = 3
     };
     /// @brief The directive specifies what checks to perform on client 
     ///        certificates in an incoming TLS session.
