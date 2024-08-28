@@ -1,10 +1,5 @@
 export default function getEndpoint() {
-  var apiEndpoint = 'http://127.0.0.1:8080/';
-  if (import.meta.env.mode === 'production') {
-    if (import.meta.env.production.VITE_CCT_ENDPOINT !== '') {
-      apiEndpoint = import.meta.env.production.VITE_CCT_ENDPOINT; 
-    }
-  }
-  return apiEndpoint;
+  const apiUrl = process.env.NODE_ENV === 'production' ? process.env.REACT_APP_PROD_API_URL : process.env.REACT_APP_DEV_API_URL;
+  return apiUrl;
 };
 
