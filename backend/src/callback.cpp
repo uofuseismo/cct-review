@@ -79,7 +79,7 @@ public:
         authorize(const std::string jsonWebToken) const
     {
         IAuthenticator::Credentials credentials;
-        spdlog::info(jsonWebToken);
+        spdlog::debug("Created: " + jsonWebToken);
         try
         {
              credentials = mAuthenticator->authorize(jsonWebToken);
@@ -156,14 +156,14 @@ std::string Callback::operator()(
         }
         if (authorizationField.at(0) == "Basic")
         {
-            spdlog::info("Basic authentication");
+            spdlog::debug("Basic authentication");
             auto [jsonResponse, temporaryCredentials] 
                 = pImpl->authenticate(authorizationField.at(1));
             return jsonResponse.dump();
         }
         else if (authorizationField.at(0) == "Bearer")
         {
-            spdlog::info("Bearer authorization");
+            spdlog::debug("Bearer authorization");
             credentials = pImpl->authorize(authorizationField.at(1));
         }
         else
@@ -203,46 +203,42 @@ std::string Callback::operator()(
     {
         throw BadRequestException("Empty request");
     }
-    nlohmann::json result;
-    nlohmann::json object;
+    nlohmann::json request;
     try
     {
-        object = nlohmann::json::parse(message);
+        request = nlohmann::json::parse(message);
     }   
     catch (const std::exception &e)
     {
         throw std::runtime_error("Could not parse JSON request");
     }
-    if (!object.contains("request_type"))
+    if (!request.contains("request_type"))
     {
         throw BadRequestException("request_type not set in JSON request");
     }
-    auto requestType = object["request_type"].template get<std::string> ();
+    auto requestType = request["request_type"].template get<std::string> ();
     spdlog::info("Received request type " + requestType
                + " from " + credentials.user);
     // Schema requests
     if (requestType == "availableSchemas")
     {
-        nlohmann::json object;
-        object["status"] = "success";
-        object["request"] = "availableSchemas";
-        object["availableSchemas"]
+        nlohmann::json result;
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["availableSchemas"]
             = std::vector<std::string>
               {PRODUCTION_SCHEMA, TEST_SCHEMA};
-        return object.dump();
+        return result.dump();
     }
-
-    // Lightweight CCT data
-    if (requestType == "cctData")
+    else if (requestType == "cctData")
     {
-        if (!object.contains("schema"))
+        if (!request.contains("schema"))
         {
             throw BadRequestException("schema not set in JSON request");
         }
         spdlog::debug("Performing lightweight data request for "
                     + credentials.user);
-        auto schema = object["schema"].template get<std::string> ();
-        nlohmann::json object;
+        auto schema = request["schema"].template get<std::string> ();
         std::string cctData;
         if (schema == PRODUCTION_SCHEMA)
         {
@@ -257,18 +253,19 @@ std::string Callback::operator()(
             throw BadRequestException("Invalid schema: " + schema); 
         }
         //std::cout << cctData << std::endl;
-        object["status"] = "success";
-        object["request"] = "cctData";
-        object["events"] = std::move(cctData);
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["events"] = std::move(cctData);
+        return result.dump();
     }
     else if (requestType == "eventData")
     {
-        if (!object.contains("schema"))
+        if (!request.contains("schema"))
         {
             throw BadRequestException("schema not set in JSON request");
         }
-        if (!object.contains("eventIdentifier"))
+        if (!request.contains("eventIdentifier"))
         {
             throw BadRequestException(
                 "eventIdentifier not set in JSON request");
@@ -276,15 +273,15 @@ std::string Callback::operator()(
         spdlog::debug("Performing heavyweight data request for "
                     + credentials.user);
         auto eventIdentifier
-            = object["eventIdentifier"].template get<std::string> ();
-        auto schema = object["schema"].template get<std::string> (); 
-        nlohmann::json object;
+            = request["eventIdentifier"].template get<std::string> ();
+        auto schema = request["schema"].template get<std::string> (); 
+        nlohmann::json result;
         std::string eventData;
         if (schema == PRODUCTION_SCHEMA)
         {
             eventData = pImpl->mProductionEvents->heavyWeightDataToString(eventIdentifier, -1); 
         }
-        else if (schema == PRODUCTION_SCHEMA)
+        else if (schema == TEST_SCHEMA)
         {
             eventData = pImpl->mTestEvents->heavyWeightDataToString(eventIdentifier, -1);
         }
@@ -292,29 +289,28 @@ std::string Callback::operator()(
         {
             throw BadRequestException("Invalid schema: " + schema); 
         }
-        object["status"] = "success";
-        object["request"] = "eventData"; 
-        object["eventIdentifier"] = eventIdentifier;
-        object["data"] = std::move(eventData);
-        return object.dump();
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        result["data"] = std::move(eventData);
+        return result.dump();
     }
     else if (requestType == "accept")
     {
-        if (!object.contains("schema"))
+        if (!request.contains("schema"))
         {
             throw BadRequestException("schema not set in JSON request");
         }
-        if (!object.contains("eventIdentifier"))
+        if (!request.contains("eventIdentifier"))
         {
             throw BadRequestException(
                 "eventIdentifier not set in JSON request");
         }
         spdlog::debug("Performing heavyweight data request for "
                     + credentials.user);
-        nlohmann::json object;
         auto eventIdentifier
-            = object["eventIdentifier"].template get<std::string> (); 
-        auto schema = object["schema"].template get<std::string> (); 
+            = request["eventIdentifier"].template get<std::string> (); 
+        auto schema = request["schema"].template get<std::string> (); 
         std::string status{"failure"};
         std::string reason;
         if (schema == PRODUCTION_SCHEMA)
@@ -349,29 +345,29 @@ std::string Callback::operator()(
         {
             throw BadRequestException("Invalid schema: " + schema); 
         }
-        object["status"] = status;
-        object["request"] = "accept"; 
-        object["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){object["reason"] = reason;}
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = status;
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){result["reason"] = reason;}
+        return result.dump();
     }
     else if (requestType == "reject")
     {
-        if (!object.contains("schema"))
+        if (!request.contains("schema"))
         {
             throw BadRequestException("schema not set in JSON request");
         }
-        if (!object.contains("eventIdentifier"))
+        if (!request.contains("eventIdentifier"))
         {
             throw BadRequestException(
                 "eventIdentifier not set in JSON request");
         }
         spdlog::debug("Performing heavyweight data request for "
                     + credentials.user);
-        nlohmann::json object;
         auto eventIdentifier
-            = object["eventIdentifier"].template get<std::string> (); 
-        auto schema = object["schema"].template get<std::string> (); 
+            = request["eventIdentifier"].template get<std::string> (); 
+        auto schema = request["schema"].template get<std::string> (); 
         std::string status{"failure"};
         std::string reason;
         if (schema == PRODUCTION_SCHEMA)
@@ -406,11 +402,12 @@ std::string Callback::operator()(
         {
             throw BadRequestException("Invalid schema: " + schema);
         }
-        object["status"] = status;
-        object["request"] = "reject";
-        object["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){object["reason"] = reason;}
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = status;
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){result["reason"] = reason;}
+        return result.dump();
     }
     throw BadRequestException("Unhandled request type: " + requestType);
 }

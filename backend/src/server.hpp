@@ -264,14 +264,13 @@ handleRequest(
     /// Options request for CORS
     auto optionsHandler = [&request]()
     {
-        spdlog::info("CORS");
+        spdlog::debug("CORS");
         boost::beast::http::response<boost::beast::http::string_body> result
         {
             boost::beast::http::status::no_content,
             request.version()
         };
-        result.set(boost::beast::http::field::access_control_allow_origin,
-                   "*");
+        result.set(boost::beast::http::field::access_control_allow_origin, "*");
         result.set("Access-Control-Allow-Credentials",
                    "true");
         result.set(boost::beast::http::field::access_control_allow_methods,
@@ -301,7 +300,7 @@ handleRequest(
             boost::beast::http::status::internal_server_error,
             request.version()
         };
-        //result.set(boost::beast::http::field::access_control_allow_origin, "*");
+        result.set(boost::beast::http::field::access_control_allow_origin, "*");
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -345,8 +344,7 @@ handleRequest(
                 boost::beast::http::status::ok,
                 request.version()
             };
-            result.set(boost::beast::http::field::access_control_allow_origin,
-                       "*");
+            result.set(boost::beast::http::field::access_control_allow_origin, "*");
             result.set(boost::beast::http::field::server,
                        BOOST_BEAST_VERSION_STRING);
             result.set(boost::beast::http::field::content_type,

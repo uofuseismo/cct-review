@@ -2,6 +2,9 @@ import React from 'react';
 import { Badge, Button, Container, Link, Text, Tooltip, HStack, VStack } from '@chakra-ui/react';
 import { Table, TableContainer, Thead, Tbody, Tr, Th, Td } from "@chakra-ui/react";
 import { ArrowForwardIcon, CheckIcon, DeleteIcon, DownloadIcon, ExternalLinkIcon } from '@chakra-ui/icons';
+import { Alert, AlertIcon } from '@chakra-ui/react';
+import acceptFromAPI from '/src/utilities/acceptFromAPI';
+import rejectFromAPI from '/src/utilities/rejectFromAPI';
 import getHeavyWeightDataFromAPI from '/src/utilities/getHeavyWeightDataFromAPI';
 { /* import downloadJSONData from '/src/utilities/downloadJSONData'; */ }
 { /* import Button from '@mui/material/Button'; */ }
@@ -87,7 +90,11 @@ function FitBadges( {likelyPoorlyConstrained, inconsistentMagnitude} ) {
 }
 
 function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
-  var [ dataIsRequested, setDataIsRequested ] = React.useState( false ); 
+  var [ dataIsRequested,  setDataIsRequested  ] = React.useState( false ); 
+  var [ acceptRequested,  setAcceptRequested  ] = React.useState( false );
+  var [ rejectRequested,  setRejectRequested  ] = React.useState( false );
+  var [ showSuccessAlert, setShowSuccessAlert ] = React.useState( false );
+  var [ showFailureAlert, setShowFailureAlert ] = React.useState( false ); 
   var eventIdentifier = null;
   var mwCodaMagnitude = null;
   var catalogMagnitude = null;
@@ -115,7 +122,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
   if ( catalogMagnitude && mwCodaMagnitude ) {
     if ( catalogMagnitudeType === 'l' ) {
       if (Math.abs(mwCodaMagnitude - (0.94*catalogMagnitude + 0.36)) > 0.29) {
-        console.log("Inconsistent magnitude");
+        console.debug("Inconsistent magnitude");
         inconsistentMagnitude = true;
       } 
     } 
@@ -127,33 +134,65 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
     }
   }
 
-  // Javascript solution to download a file
+  { /* Download heavyweight data for event in a JSON file */ }
   const downloadJSON = () => {
-     if ( {eventIdentifier} ) {
-       setDataIsRequested(true);
-       getHeavyWeightDataFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
-         setDataIsRequested(false);
-         // File object
-         if ( jsonData !== null ) {
-           console.debug("Creating download link...");
-           console.debug(jsonData);
-           //const file = new Blob([{jsonData}], {type: 'data:text/json;charset=utf-8,'});
-           const dataString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonData));
-           // Anchor link
-           let downloadAnchorNode = document.createElement("a");
-           downloadAnchorNode.setAttribute("href",      dataString);
-           downloadAnchorNode.setAttribute("download", `${eventIdentifier}-cct-data.json`);
-           // Simulte link click
-           document.body.appendChild(downloadAnchorNode); // Required for firefox
-           downloadAnchorNode.click(); 
-           downloadAnchorNode.remove();
-           console.log("Download");
-         }
-         else {
-           console.warn("No data to download");
-         }
-       });
-     }
+    if ( {eventIdentifier} ) {
+      setDataIsRequested(true);
+      getHeavyWeightDataFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
+        setDataIsRequested(false);
+        { /* File object */ }
+        if ( jsonData !== null ) {
+          console.debug("Creating download link...");
+          console.debug(jsonData);
+          //const file = new Blob([{jsonData}], {type: 'data:text/json;charset=utf-8,'});
+          const dataString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonData));
+          { /* Anchor link */ }
+          let downloadAnchorNode = document.createElement("a");
+          downloadAnchorNode.setAttribute("href",      dataString);
+          downloadAnchorNode.setAttribute("download", `${eventIdentifier}-cct-data.json`);
+          { /* Simulte link click */ }
+          document.body.appendChild(downloadAnchorNode); { /* Required for firefox */ }
+          downloadAnchorNode.click(); 
+          downloadAnchorNode.remove();
+          console.log("Download");
+        }
+        else {
+          console.warn("No data to download");
+        }
+      });
+    }
+  }
+
+  const acceptMagnitude = () => {
+    if ( {eventIdentifier} ) {
+      setAcceptRequested(true);
+      acceptFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
+        setAcceptRequested(false);
+        if ( jsonData !== null ) {
+          if (jsonData.status.toLowerCase() === 'success') {
+            alert('Successfully accepted magnitude');
+            return;
+          }
+        }
+        alert('Failed to accept magnitude');
+      });
+    }
+  }
+
+  const rejectMagnitude = () => {
+    if ( {eventIdentifier} ) { 
+      setRejectRequested(true);
+      rejectFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
+        setRejectRequested(false);
+        if ( jsonData !== null ) { 
+          if (jsonData.status.toLowerCase() === 'success') {
+            alert('Successfully rejected magnitude');
+            return;
+          }
+        }
+        alert('Failed to reject magnitude');
+      });
+    }
   }
 
   return (
@@ -196,9 +235,10 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
          colorScheme='green'
          rightIcon={<CheckIcon />}
          isDisabled={!canSubmit}
+         isLoading={acceptRequested}
          onClick={ () => {
-           alert('Magnitude submitted!');
-         } } 
+           acceptMagnitude()
+         } }
         >
          Accept
         </Button>
@@ -208,8 +248,9 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
          colorScheme='red'
          rightIcon={<DeleteIcon />} 
          isDisabled={!canSubmit}
+         isLoading={rejectRequested}
          onClick={ () => {
-           alert('Magnitude rejected!');
+           rejectMagnitude();
          } }
         >
          Reject 
@@ -222,7 +263,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
          rightIcon={<DownloadIcon />}
          isLoading={dataIsRequested}
          onClick={ () => {
-           downloadJSON();
+           downloadJSON()
          } }
         >
          Download
@@ -231,93 +272,5 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
     </React.Fragment>
   );
 }
-
-function TableFit1( {eventIdentifier,
-                     mwCodaMagnitude,
-                     catalogMagnitude,
-                     likelyPoorlyConstrained} ) {
-  console.log("Rendering table fit...");
-  const url = `https://earthquake.usgs.gov/earthquakes/eventpage/uu${eventIdentifier}/executive`;
-  const jsonData = "{'event': 1212}";
-
-  // Javascript solution to download a file
-  const downloadJSON = () => {
-     // File object
-     //const file = new Blob([{jsonData}], {type: 'data:text/json;charset=utf-8,'});
-     const dataString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({jsonData}));
-     // Anchor link
-     let downloadAnchorNode = document.createElement("a");
-     downloadAnchorNode.setAttribute("href",      dataString);
-     downloadAnchorNode.setAttribute("download", `${eventIdentifier}-cct-data.json`);
-     // Simulte link click
-     document.body.appendChild(downloadAnchorNode); // Required for firefox
-     downloadAnchorNode.click(); 
-     downloadAnchorNode.remove();
-     console.log("download");
-  }
-
-  var mwCodaMagnitudeToDisplay = "";
-  if (typeof mwCodaMagnitude === 'number') {
-    mwCodaMagnitudeToDisplay = mwCodaMagnitude.toFixed(2);
-  }
-  var catalogMagnitudeToDisplay = "";
-  if (typeof catalogMagnitude.value === 'number') {
-    catalogMagnitudeToDisplay = `${catalogMagnitude.value.toFixed(2)} M${catalogMagnitude.type}`;
-  }
-
-  return (
-    <div>
-      <Box height={500}
-           component="section"
-           sx={ { borderRight: '1px dashed grey',
-                  p: 2
-                } }>
-        <Stack spacing={1}>
-          <Item>Event: <a href={url} target="_blank">{eventIdentifier}</a></Item>
-          <Item>Mw,Coda: {mwCodaMagnitudeToDisplay} Mw</Item>
-          <Item>Catalog Magnitude: {catalogMagnitudeToDisplay}</Item>
-          <Item>
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="CCT indicates the magnitude was not well estimated.">
-                <Chip label="Unconstrained!"  icon={<WarningAmberIcon />} color="warning"/>
-              </Tooltip>
-              <Tooltip title="Mw,coda is too different from the Richter magnitude; i.e., |Mw,coda - 0.94 Ml + 0.36| > 0.29.">
-                <Chip label="MagDev!"  icon={<WarningAmberIcon />} color="warning"/>
-              </Tooltip>
-              <Tooltip title="Magnitudes appear consistent and CCT thinks the magnitude was well-estimated">
-                <Chip label="" icon={<CheckIcon />} color="success"/>
-              </Tooltip>
-            </Stack>
-          </Item>
-          <Stack direction="column" spacing={0.3}>
-            <Tooltip title="Publish the magnitude to AQMS/ComCat">
-              <Button aria-label="Accept magnitude" variant="contained" color="success" endIcon={<SendIcon />}
-                      onClick={ () => {
-                       alert('Magnitude submitted!');
-                      } } >
-                Accept
-              </Button>
-            </Tooltip>
-            <Tooltip title="Reject the Mw,Coda magnitude">
-              <Button aria-label="Reject magnitude" variant="contained" color="error" endIcon={<DeleteIcon />}
-                      onClick={ () => {
-                      alert('Magnitude rejected!');
-                    } } >
-                Reject
-              </Button>
-            </Tooltip>
-            <Tooltip title="Download the CCT JSON payload">
-              <Button aria-label="Download JSON" variant="outlined" color="secondary" endIcon={<FileDownloadIcon />}
-                      onClick={downloadJSON}
-                              >
-                Download
-              </Button>
-             </Tooltip>
-          </Stack>
-        </Stack>
-      </Box>
-    </div>
-  );
-}; 
 
 export default TableFit;
