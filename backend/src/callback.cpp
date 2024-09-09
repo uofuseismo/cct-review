@@ -1,17 +1,17 @@
 #include <string>
+#include <map>
 #include <iostream>
 #include <functional>
 #include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include "cctPostgresService.hpp"
 #include "callback.hpp"
 #include "permissions.hpp"
 #include "events.hpp"
 #include "exceptions.hpp"
 #include "authenticator.hpp"
 #include "base64.hpp"
-#define PRODUCTION_SCHEMA "production"
-#define TEST_SCHEMA "test"
 
 using namespace CCTService;
 
@@ -102,17 +102,23 @@ public:
                                > &,
                                const std::string &,
                                const boost::beast::http::verb)> mCallbackFunction;
-    std::shared_ptr<Events> mProductionEvents{nullptr};
-    std::shared_ptr<Events> mTestEvents{nullptr};
+    std::shared_ptr<CCTPostgresService> mCCTPostgresService{nullptr};
     std::shared_ptr<CCTService::IAuthenticator> mAuthenticator{nullptr};
 };
 
 /// @brief Constructor.
-Callback::Callback(std::shared_ptr<Events> productionEvents,
-                   std::shared_ptr<Events> testEvents,
+Callback::Callback(std::shared_ptr<CCTPostgresService> &cctEventsService,
                    std::shared_ptr<CCTService::IAuthenticator> authenticator) :
     pImpl(std::make_unique<CallbackImpl> ())
 {
+    if (cctEventsService == nullptr)
+    {
+        throw std::invalid_argument("CCT events service is NULL");
+    }
+    if (!cctEventsService->isRunning())
+    {
+        throw std::runtime_error("CCT event service is not running");
+    }
     if (authenticator == nullptr)
     {
         throw std::invalid_argument("Authenticator is NULL");
@@ -123,8 +129,7 @@ Callback::Callback(std::shared_ptr<Events> productionEvents,
                     std::placeholders::_1,
                     std::placeholders::_2,
                     std::placeholders::_3);
-    pImpl->mProductionEvents = productionEvents;
-    pImpl->mTestEvents = testEvents;
+    pImpl->mCCTPostgresService = cctEventsService;
     pImpl->mAuthenticator = authenticator;
 }
 
@@ -203,211 +208,203 @@ std::string Callback::operator()(
     {
         throw BadRequestException("Empty request");
     }
-    nlohmann::json request;
+    nlohmann::json result;
+    nlohmann::json object;
     try
     {
-        request = nlohmann::json::parse(message);
+        object = nlohmann::json::parse(message);
     }   
     catch (const std::exception &e)
     {
         throw std::runtime_error("Could not parse JSON request");
     }
-    if (!request.contains("request_type"))
+    if (!object.contains("request_type"))
     {
         throw BadRequestException("request_type not set in JSON request");
     }
-    auto requestType = request["request_type"].template get<std::string> ();
+    auto requestType = object["request_type"].template get<std::string> ();
     spdlog::info("Received request type " + requestType
                + " from " + credentials.user);
     // Schema requests
     if (requestType == "availableSchemas")
     {
-        nlohmann::json result;
-        result["status"] = "success";
-        result["request"] = requestType;
-        result["availableSchemas"]
-            = std::vector<std::string>
-              {PRODUCTION_SCHEMA, TEST_SCHEMA};
-        return result.dump();
+        nlohmann::json object;
+        object["status"] = "success";
+        object["request"] = "availableSchemas";
+        object["availableSchemas"] = pImpl->mCCTPostgresService->getSchemas();
+        return object.dump();
+    }
+
+    // Lightweight CCT data
+    if (requestType == "hash")
+    {
+        if (!object.contains("schema"))
+        {
+            throw BadRequestException("schema not set in JSON request");
+        }
+        auto schema = object["schema"].template get<std::string> (); 
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
+        {
+            throw BadRequestException("Invalid schema: " + schema);
+        }
+        auto hash = pImpl->mCCTPostgresService->getCurrentHash(schema);
+        object["status"] = "success";
+        object["request"] = "hash";
+        object["hash"] = hash;
+        return object.dump();
     }
     else if (requestType == "cctData")
     {
-        if (!request.contains("schema"))
+        if (!object.contains("schema"))
         {
             throw BadRequestException("schema not set in JSON request");
         }
         spdlog::debug("Performing lightweight data request for "
                     + credentials.user);
-        auto schema = request["schema"].template get<std::string> ();
-        std::string cctData;
-        if (schema == PRODUCTION_SCHEMA)
-        {
-            cctData = pImpl->mProductionEvents->lightWeightDataToString(-1); 
-        }
-        else if (schema == TEST_SCHEMA)
-        {
-            cctData = pImpl->mTestEvents->lightWeightDataToString(-1);
-        }
-        else
-        {
-            throw BadRequestException("Invalid schema: " + schema); 
-        }
-        //std::cout << cctData << std::endl;
-        nlohmann::json result;
-        result["status"] = "success";
-        result["request"] = requestType;
-        result["events"] = std::move(cctData);
-        return result.dump();
-    }
-    else if (requestType == "eventData")
-    {
-        if (!request.contains("schema"))
-        {
-            throw BadRequestException("schema not set in JSON request");
-        }
-        if (!request.contains("eventIdentifier"))
-        {
-            throw BadRequestException(
-                "eventIdentifier not set in JSON request");
-        }
-        spdlog::debug("Performing heavyweight data request for "
-                    + credentials.user);
-        auto eventIdentifier
-            = request["eventIdentifier"].template get<std::string> ();
-        auto schema = request["schema"].template get<std::string> (); 
-        nlohmann::json result;
-        std::string eventData;
-        if (schema == PRODUCTION_SCHEMA)
-        {
-            eventData = pImpl->mProductionEvents->heavyWeightDataToString(eventIdentifier, -1); 
-        }
-        else if (schema == TEST_SCHEMA)
-        {
-            eventData = pImpl->mTestEvents->heavyWeightDataToString(eventIdentifier, -1);
-        }
-        else
-        {
-            throw BadRequestException("Invalid schema: " + schema); 
-        }
-        result["status"] = "success";
-        result["request"] = requestType;
-        result["eventIdentifier"] = eventIdentifier;
-        result["data"] = std::move(eventData);
-        return result.dump();
-    }
-    else if (requestType == "accept")
-    {
-        if (!request.contains("schema"))
-        {
-            throw BadRequestException("schema not set in JSON request");
-        }
-        if (!request.contains("eventIdentifier"))
-        {
-            throw BadRequestException(
-                "eventIdentifier not set in JSON request");
-        }
-        spdlog::debug("Performing heavyweight data request for "
-                    + credentials.user);
-        auto eventIdentifier
-            = request["eventIdentifier"].template get<std::string> (); 
-        auto schema = request["schema"].template get<std::string> (); 
-        std::string status{"failure"};
-        std::string reason;
-        if (schema == PRODUCTION_SCHEMA)
-        {
-            if (!pImpl->mProductionEvents->contains(eventIdentifier))
-            {
-                reason = eventIdentifier + " does not exist";
-                spdlog::error(reason);
-            }
-            else
-            {
-                spdlog::info("Accepting magnitude for " + eventIdentifier
-                           + " on production machine");
-                status = "success";
-            }
-        }
-        else if (schema == TEST_SCHEMA)
-        {
-            if (!pImpl->mTestEvents->contains(eventIdentifier))
-            {
-                reason = eventIdentifier + " does not exist";
-                spdlog::error(reason);
-            }   
-            else
-            {
-                spdlog::info("Accepting magnitude for " + eventIdentifier
-                           + " on test machine");
-                status = "success";
-            }
-        }
-        else
-        {
-            throw BadRequestException("Invalid schema: " + schema); 
-        }
-        nlohmann::json result;
-        result["status"] = status;
-        result["request"] = requestType;
-        result["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){result["reason"] = reason;}
-        return result.dump();
-    }
-    else if (requestType == "reject")
-    {
-        if (!request.contains("schema"))
-        {
-            throw BadRequestException("schema not set in JSON request");
-        }
-        if (!request.contains("eventIdentifier"))
-        {
-            throw BadRequestException(
-                "eventIdentifier not set in JSON request");
-        }
-        spdlog::debug("Performing heavyweight data request for "
-                    + credentials.user);
-        auto eventIdentifier
-            = request["eventIdentifier"].template get<std::string> (); 
-        auto schema = request["schema"].template get<std::string> (); 
-        std::string status{"failure"};
-        std::string reason;
-        if (schema == PRODUCTION_SCHEMA)
-        {
-            if (!pImpl->mProductionEvents->contains(eventIdentifier))
-            {
-                reason = eventIdentifier + " does not exist";
-                spdlog::error(reason);
-            }
-            else
-            {
-                spdlog::info("Rejecting magnitude for " + eventIdentifier
-                           + " on production machine");
-                status = "success";
-            }   
-        }
-        else if (schema == TEST_SCHEMA)
-        {
-            if (!pImpl->mTestEvents->contains(eventIdentifier))
-            {
-                reason = eventIdentifier + " does not exist";
-                spdlog::error(reason);
-            }   
-            else
-            {
-                spdlog::info("Rejecting magnitude for " + eventIdentifier
-                           + " on test machine");
-                status = "success";
-            }
-        }
-        else
+        auto schema = object["schema"].template get<std::string> ();
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
         {
             throw BadRequestException("Invalid schema: " + schema);
         }
-        nlohmann::json result;
-        result["status"] = status;
-        result["request"] = requestType;
-        result["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){result["reason"] = reason;}
-        return result.dump();
+        nlohmann::json object;
+        std::string cctData
+            = pImpl->mCCTPostgresService->lightWeightDataToString(schema, -1); 
+        //std::cout << cctData << std::endl;
+        object["status"] = "success";
+        object["request"] = "cctData";
+        object["events"] = std::move(cctData);
+        return object.dump();
+    }
+    else if (requestType == "eventData")
+    {
+        if (!object.contains("schema"))
+        {
+            throw BadRequestException("schema not set in JSON request");
+        }
+        if (!object.contains("eventIdentifier"))
+        {
+            throw BadRequestException(
+                "eventIdentifier not set in JSON request");
+        }
+        spdlog::debug("Performing heavyweight data request for "
+                    + credentials.user);
+        auto eventIdentifier
+            = object["eventIdentifier"].template get<std::string> ();
+        if (eventIdentifier.empty())
+        {
+            throw BadRequestException("Event identifier is empty");
+        }
+        auto schema = object["schema"].template get<std::string> (); 
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
+        {
+            throw BadRequestException("Invalid schema: " + schema);
+        }
+        nlohmann::json object;
+        std::string eventData;
+        try
+        {
+            eventData
+               = pImpl->mCCTPostgresService->heavyWeightDataToString(
+                     schema, eventIdentifier, -1);
+        }
+        catch (const std::exception &e)
+        {
+            throw BadRequestException("Invalid event identifier: "
+                                    + eventIdentifier); 
+        }
+        object["status"] = "success";
+        object["request"] = "eventData"; 
+        object["eventIdentifier"] = eventIdentifier;
+        object["data"] = std::move(eventData);
+        return object.dump();
+    }
+    else if (requestType == "accept")
+    {
+        if (!object.contains("schema"))
+        {
+            throw BadRequestException("schema not set in JSON request");
+        }
+        if (!object.contains("eventIdentifier"))
+        {
+            throw BadRequestException(
+                "eventIdentifier not set in JSON request");
+        }
+        spdlog::debug("Performing heavyweight data request for "
+                    + credentials.user);
+        nlohmann::json object;
+        auto eventIdentifier
+            = object["eventIdentifier"].template get<std::string> (); 
+        if (eventIdentifier.empty())
+        {
+            throw BadRequestException("Event identifier is empty");
+        }
+        auto schema = object["schema"].template get<std::string> (); 
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
+        {
+            throw BadRequestException("Invalid schema: " + schema);
+        }
+        std::string status{"failure"};
+        std::string reason;
+        if (!pImpl->mCCTPostgresService->haveEvent(schema, eventIdentifier))
+        {
+            reason = eventIdentifier + " does not exist";
+            spdlog::error(reason);
+        }
+        else
+        {
+            spdlog::info("Accepting magnitude for " + eventIdentifier
+                       + " on production machine");
+            status = "success";
+        }
+        object["status"] = status;
+        object["request"] = "accept"; 
+        object["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){object["reason"] = reason;}
+        return object.dump();
+    }
+    else if (requestType == "reject")
+    {
+        if (!object.contains("schema"))
+        {
+            throw BadRequestException("schema not set in JSON request");
+        }
+        if (!object.contains("eventIdentifier"))
+        {
+            throw BadRequestException(
+                "eventIdentifier not set in JSON request");
+        }
+        spdlog::debug("Performing heavyweight data request for "
+                    + credentials.user);
+        nlohmann::json object;
+        auto eventIdentifier
+            = object["eventIdentifier"].template get<std::string> (); 
+        if (eventIdentifier.empty())
+        {
+            throw BadRequestException("Event identifier is empty");
+        }
+        auto schema = object["schema"].template get<std::string> (); 
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
+        {
+            throw BadRequestException("Invalid schema: " + schema);
+        }
+        std::string status{"failure"};
+        std::string reason;
+        if (!pImpl->mCCTPostgresService->haveEvent(schema, eventIdentifier))
+        {
+            reason = eventIdentifier + " does not exist";
+            spdlog::error(reason);
+        }
+        else
+        {
+            spdlog::info("Rejecting magnitude for " + eventIdentifier
+                       + " on production machine");
+            status = "success";
+        }   
+        object["status"] = status;
+        object["request"] = "reject";
+        object["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){object["reason"] = reason;}
+        return object.dump();
     }
     throw BadRequestException("Unhandled request type: " + requestType);
 }

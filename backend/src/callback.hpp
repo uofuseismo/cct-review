@@ -2,12 +2,15 @@
 #define CCT_BACKEND_SERVICE_CALLBACK_HPP
 #include <string>
 #include <memory>
+#include <map>
 #include <functional>
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/verb.hpp>
 namespace CCTService
 {
 class IAuthenticator;
+class CCTPostgresService;
+class AQMSPostgres;
 class Events;
 }
 namespace CCTService
@@ -22,9 +25,9 @@ class Callback
 {
 public:
     /// @brief Constructor.
+    /// @param[in] cctService      The CCT database service.
     /// @param[in] authenticator   The authenticator.
-    Callback(std::shared_ptr<CCTService::Events> productionEvents,
-             std::shared_ptr<CCTService::Events> testEvents,
+    Callback(std::shared_ptr<CCTPostgresService> &cctService,
              std::shared_ptr<CCTService::IAuthenticator> authenticator);
     /// @brief Destructor.
     ~Callback();
