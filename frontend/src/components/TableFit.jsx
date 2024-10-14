@@ -49,7 +49,7 @@ function InconsistentMagnitude( {inconsistentMagnitude} ) {
   }
 }
 
-function LikelyPoorlyConstrained( {likelyPoorlyConstrained,} ) { 
+function LikelyPoorlyConstrained( {likelyPoorlyConstrained} ) { 
   if ( likelyPoorlyConstrained ) { 
     return (
       <React.Fragment>
@@ -67,13 +67,35 @@ function LikelyPoorlyConstrained( {likelyPoorlyConstrained,} ) {
   }
 }
 
-function FitBadges( {likelyPoorlyConstrained, inconsistentMagnitude} ) {
-  if ( likelyPoorlyConstrained | inconsistentMagnitude ) {
+function AnomalousAmplitude( {anomalousAmplitude} ) {  
+  if ( anomalousAmplitude ) { 
+    return (
+      <React.Fragment>
+        <Tooltip label='There exists a residual that exceeds one order of magnitude'>
+          <Badge colorScheme='orange'>AA</Badge> 
+        </Tooltip>
+      </React.Fragment>
+    );  
+  }
+  else {
+    return (
+      <React.Fragment>
+      </React.Fragment>
+    );
+  }
+}
+
+
+function FitBadges( {likelyPoorlyConstrained,
+                     inconsistentMagnitude,
+                     anomalousAmplitude} ) {
+  if ( likelyPoorlyConstrained | inconsistentMagnitude  | anomalousAmplitude ) {
     return (
       <React.Fragment>
         <HStack>
           <InconsistentMagnitude inconsistentMagnitude={inconsistentMagnitude} />
           <LikelyPoorlyConstrained likelyPoorlyConstrained={likelyPoorlyConstrained} />
+          <AnomalousAmplitude anomalousAmplitude={anomalousAmplitude} />
         </HStack>
       </React.Fragment>
     );
@@ -134,6 +156,23 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
     }
   }
 
+  var anomalousAmplitude = false;
+  if ( eventData) {
+    if ( eventData.stationMeasurements ) {
+      const stationMeasurements = eventData.stationMeasurements;
+      for (var i = 0; i < stationMeasurements.length; i++) {
+        anomalousAmplitude = stationMeasurements[i].measurements.some(
+            (element) => Math.abs(element.residual) >= 1.0 );
+        if (anomalousAmplitude) {
+          break;
+        }
+      }
+      if ( anomalousAmplitude ) {
+        console.info('Anomalous amplitude detected');
+      }
+    }
+  }
+
   { /* Download heavyweight data for event in a JSON file */ }
   const downloadJSON = () => {
     if ( {eventIdentifier} ) {
@@ -150,7 +189,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
           let downloadAnchorNode = document.createElement("a");
           downloadAnchorNode.setAttribute("href",      dataString);
           downloadAnchorNode.setAttribute("download", `${eventIdentifier}-cct-data.json`);
-          { /* Simulte link click */ }
+          { /* Simulate link click */ }
           document.body.appendChild(downloadAnchorNode); { /* Required for firefox */ }
           downloadAnchorNode.click(); 
           downloadAnchorNode.remove();
@@ -223,6 +262,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
                    <FitBadges
                      likelyPoorlyConstrained={likelyPoorlyConstrained}
                      inconsistentMagnitude={inconsistentMagnitude}
+                     anomalousAmplitude={anomalousAmplitude}
                    />
                  </Td>
                </Tr>

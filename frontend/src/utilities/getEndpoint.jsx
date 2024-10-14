@@ -1,6 +1,5 @@
 export default function getEndpoint() {
   if (import.meta.env.MODE === 'production') {
-    console.log("hey");
     console.log(import.meta.env.VITE_CCT_API_PRODUCTION_URL);
     return import.meta.env.VITE_CCT_API_PRODUCTION_URL;
   }
