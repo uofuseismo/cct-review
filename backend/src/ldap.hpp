@@ -70,6 +70,9 @@ public:
     /// @result True indicates the LDAP authenticator is initialized.
     [[nodiscard]] bool isInitialized() const noexcept;
     /// @result Returns true if the user with the password was authenticated.
+    ///         Additionally, this will add the user, password to the list
+    ///         of authenticated users upon which a JSON Web Token can be
+    ///         obtained.
     [[nodiscard]] bool authenticate(const std::string &user, const std::string &password) override final;
     /// @brief Disconnects.
     void unbind();

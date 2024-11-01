@@ -135,20 +135,6 @@ public:
     void disconnect();
     /// }
 
-    /// @brief Loads the database connection information from an
-    ///        initialization file.
-    /// @param[in] fileName  The name of the initialization file.
-    /// @param[in] section   The section of the initialization file
-    ///                      with the requisite connection information.
-    /// @throws std::invalid_argument if fileName cannot be found or
-    ///         information cannot be found.
-    /// @note The user, password and database name, if not specified, will
-    ///       be extracted from the URTS_AQMS_RDONLY_USER,
-    ///       URTS_AQMS_RDONLY_PASSWORD, and URTS_AQMS_RDONLY_DATABASE_NAME
-    ///       environment variables, respectively.
-    void parseInitializationFile(const std::string &fileName,
-                                 const std::string &section = "PostgreSQL");
-
     /// @name Destructors
     /// @{
 
