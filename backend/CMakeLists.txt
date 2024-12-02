@@ -3,6 +3,7 @@ project(CCTReviewService VERSION 0.1.0 LANGUAGES CXX)
 enable_testing()
 
 option(ENABLE_SSL "Enable SSL connections" ON) 
+option(WITH_CORS "Compile with CORS *" OFF)
 #cmake -DBUILD_SHARED_LIBS=YES /path/to/source
 set(BUILD_SHARED_LIBS YES)
 
@@ -39,7 +40,8 @@ add_executable(cctReviewService
                src/callback.cpp
                src/authenticator.cpp
                src/permissions.cpp
-               src/postgresql.cpp)
+               src/postgresql.cpp
+               src/cctPostgresService.cpp)
 
 target_link_libraries(cctReviewService
                       PRIVATE SOCI::soci_postgresql SOCI::soci_sqlite3
@@ -58,6 +60,9 @@ set_target_properties(cctReviewService PROPERTIES
                       CXX_STANDARD 20
                       CXX_STANDARD_REQUIRED YES 
                       CXX_EXTENSIONS NO) 
+if (${WITH_CORS})
+   target_compile_definitions(cctReviewService PUBLIC ENABLE_CORS)
+endif()
 if (${ENABLE_SSL})
    target_compile_definitions(cctReviewService PUBLIC WITH_OPENSSL)
    target_link_libraries(cctReviewService PRIVATE OpenSSL::SSL OpenSSL::Crypto)

@@ -163,7 +163,9 @@ handleRequest(
             boost::beast::http::status::bad_request,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -185,7 +187,9 @@ handleRequest(
             boost::beast::http::status::forbidden,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -207,7 +211,9 @@ handleRequest(
             boost::beast::http::status::not_implemented,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -227,7 +233,9 @@ handleRequest(
             boost::beast::http::status::not_found,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -248,7 +256,9 @@ handleRequest(
             boost::beast::http::status::unauthorized,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -270,7 +280,9 @@ handleRequest(
             boost::beast::http::status::no_content,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set("Access-Control-Allow-Credentials",
                    "true");
         result.set(boost::beast::http::field::access_control_allow_methods,
@@ -300,7 +312,9 @@ handleRequest(
             boost::beast::http::status::internal_server_error,
             request.version()
         };
+#ifdef ENABLE_CORS
         result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
         result.set(boost::beast::http::field::server,
                    BOOST_BEAST_VERSION_STRING);
         result.set(boost::beast::http::field::content_type,
@@ -344,7 +358,9 @@ handleRequest(
                 boost::beast::http::status::ok,
                 request.version()
             };
+#ifdef ENABLE_CORS
             result.set(boost::beast::http::field::access_control_allow_origin, "*");
+#endif
             result.set(boost::beast::http::field::server,
                        BOOST_BEAST_VERSION_STRING);
             result.set(boost::beast::http::field::content_type,
