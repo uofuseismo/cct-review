@@ -125,15 +125,6 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    // Check command line arguments.
-    if (argc != 5)
-    {
-        std::cerr <<
-            "Usage: cctReviewService <address> <port> <doc_root> <threads>\n" <<
-            "For example, to start the service with on the localhost's port 8080 with one thread:\n" <<
-            "    cctReviewService 127.0.0.1 8080 . 1\n";
-        return EXIT_FAILURE;
-    }
 
     const std::set<std::string> schemas{"production", "test"};
 
