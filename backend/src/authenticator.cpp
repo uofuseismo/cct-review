@@ -40,10 +40,12 @@ public:
     [[nodiscard]] ::Credentials createCredentials(const std::string &user)
     {
         auto now = std::chrono::system_clock::now();
+        auto expirationTime
+            = jwt::date(now + mExpirationDuration); 
         std::string token = jwt::create()
                                 .set_type(JWT_TYPE)
                                 .set_issued_at(now)
-                                .set_expires_in(mExpirationTime)
+                                .set_expires_at(expirationTime)
                                 .set_issuer(mIssuer)
                                 .set_audience(user)
                                 .sign(jwt::algorithm::hs256{mKey});
@@ -54,7 +56,7 @@ public:
         result.jsonWebToken = std::move(token);
         result.user = user;
         result.issuedAt = nowInSeconds;
-        result.expiresAt = nowInSeconds + mExpirationTime.count();
+        result.expiresAt = nowInSeconds + mExpirationDuration.count();
         result.permissions = Permissions::ReadWrite;
         //std::cout << result.issuedAt << " " << result.expiresAt << std::endl;
         //std::cout << result.jsonWebToken << std::endl;
@@ -136,7 +138,7 @@ public:
                      + ":"
                      + std::to_string(getNow())
                     };
-    std::chrono::seconds mExpirationTime{86400};
+    std::chrono::seconds mExpirationDuration{86400};
 };
 
 /// Constructor

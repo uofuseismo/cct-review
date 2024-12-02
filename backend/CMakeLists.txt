@@ -7,6 +7,7 @@ option(WITH_CORS "Compile with CORS *" OFF)
 #cmake -DBUILD_SHARED_LIBS=YES /path/to/source
 set(BUILD_SHARED_LIBS YES)
 
+include(FetchContent)
 include(CheckCXXCompilerFlag)
 set(CMAKE_CXX_STANDARD 20) 
 set(CMAKE_CXX_STANDARD_REQUIRED ON) 
@@ -18,7 +19,7 @@ find_package(SOCI COMPONENTS postgresql sqlite3 REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(Boost COMPONENTS program_options date_time REQUIRED)
-find_package(jwt-cpp 0.7.0...2.0 REQUIRED)
+#find_package(jwt-cpp 0.7.0...2.0 REQUIRED)
 find_package(PostgreSQL REQUIRED)
 find_package(OpenLdap REQUIRED)
 find_package(Catch2 3)
@@ -32,6 +33,22 @@ if (${OPENSSL_FOUND})
    message("Found SSL version ${OPENSSL_VERSION}")
 endif()
 
+FetchContent_Declare(
+   Catch2
+   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+   GIT_TAG fa43b77429ba76c462b1898d6cd2f2d7a9416b14
+   EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(Catch2)
+   
+FetchContent_declare(
+   jwt-cpp
+   GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
+   GIT_TAG 08bcf77a687fb06e34138e9e9fa12a4ecbe12332 # v0.7.0 release
+   EXCLUDE_FROM_ALL
+)                
+set(JWT_BUILD_EXAMPLES OFF CACHE BOOL "disable building examples" FORCE)
+FetchContent_MakeAvailable(jwt-cpp)
 
 add_executable(cctReviewService
                src/main.cpp
