@@ -264,6 +264,7 @@ std::string Callback::operator()(
         auto schema = object["schema"].template get<std::string> ();
         if (!pImpl->mCCTPostgresService->haveSchema(schema))
         {
+            spdlog::error(schema + " does not exist");
             throw BadRequestException("Invalid schema: " + schema);
         }
         nlohmann::json object;
