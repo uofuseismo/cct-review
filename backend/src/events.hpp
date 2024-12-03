@@ -35,6 +35,20 @@ public:
         }
         mEvents.insert(std::move(event));
     }
+    void update(const std::pair<std::string, Event> &event)
+    {
+        auto copy = event;
+        update(std::move(copy));
+    }
+    void update(std::pair<std::string, Event> &&event)
+    {
+        if (!contains(event.first))
+        {
+            insert(std::move(event));
+            return;
+        }
+        mEvents[event.first] = std::move(event.second);
+    } 
     void generateHash()
     {
         if (mEvents.empty())
@@ -84,6 +98,10 @@ public:
     [[nodiscard]] size_t getHash() const noexcept
     {
         return mHash;
+    }
+    [[nodiscard]] Event at(const std::string &eventIdentifier) const
+    {
+        return mEvents.at(eventIdentifier);
     }
 private:
     std::map<std::string, Event> mEvents;

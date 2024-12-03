@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include <limits>
 #include <chrono>
 #include <atomic>
 #include <string>
@@ -66,8 +67,9 @@ public:
              = reinterpret_cast<soci::session *> (mConnection->getSession());
         soci::rowset<soci::row> rows
             = (session->prepare <<
-                "SELECT identifier, CAST(mw_data AS TEXT), cct_magnitude, cct_magnitude_type, authoritative_magnitude, authoritative_magnitude_type, review_status, creation_mode FROM "
+                "SELECT identifier, CAST(mw_data AS TEXT), cct_magnitude, cct_magnitude_type, authoritative_magnitude, authoritative_magnitude_type, review_status, creation_mode, EXTRACT(epoch FROM last_update) FROM "
               + schema + ".event ORDER BY load_date DESC LIMIT 50");
+        double newestUpdate = std::numeric_limits<double>::lowest();
         for (soci::rowset<soci::row>::const_iterator it = rows.begin();
              it != rows.end();
              ++it)
@@ -92,6 +94,8 @@ public:
                                      row.get<std::string> (6));
                 eventDetails.emplace("creationMode",
                                      row.get<std::string> (7));
+                double lastUpdate = row.get<double> (8);
+                newestUpdate = std::max(lastUpdate, newestUpdate);
                 //std::cout << std::setw(4) << eventDetails << std::endl;
                 Event event{eventDetails, json};
                 {
@@ -106,7 +110,93 @@ public:
             }
         }
         mEventsMap.at(schema).generateHash();
+        mLastUpdateMap.insert(std::pair {schema, newestUpdate});
         spdlog::debug("Done querying events for schema " + schema);
+    }
+    void updateQuery(const std::string &schema)
+    {
+        spdlog::debug("Performing update query from " + schema + "...");
+        if (!mConnection->isConnected())
+        {
+            spdlog::warn("Reconnecting to CCT postgres");
+            mConnection->connect();
+        }
+        if (!mConnection->isConnected())
+        {
+            spdlog::warn("CCT postgres connection broken");
+            return;
+        }
+        if (!mLastUpdateMap.contains(schema))
+        {
+            throw std::runtime_error("Can't find last update time for " + schema);
+        }
+        double newestUpdate = mLastUpdateMap[schema];
+        auto session
+             = reinterpret_cast<soci::session *> (mConnection->getSession());
+        soci::rowset<soci::row> rows
+            = (session->prepare <<
+                "SELECT identifier, CAST(mw_data AS TEXT), cct_magnitude, cct_magnitude_type, authoritative_magnitude, authoritative_magnitude_type, review_status, creation_mode, EXTRACT(epoch FROM last_update) FROM "
+              + schema + ".event "
+              + " WHERE " + schema + ".event.last_update > TO_TIMESTAMP(" + std::to_string(newestUpdate) + ") "
+              + " ORDER BY load_date DESC");
+        bool updated{false};
+        for (soci::rowset<soci::row>::const_iterator it = rows.begin();
+             it != rows.end();
+             ++it)
+        {
+            const auto &row = *it;
+            try
+            {
+                auto identifier = row.get<long long> (0);
+                auto sIdentifier = std::to_string(identifier);
+                auto json = nlohmann::json::parse(row.get<std::string> (1));
+                auto eventDetails
+                    = ::unpackCCTJSON(json, std::to_string(identifier));
+                eventDetails.emplace("cctMagnitude",
+                                     row.get<double> (2));
+                eventDetails.emplace("cctMagnitudeType",
+                                     row.get<std::string> (3));
+                eventDetails.emplace("authoritativeMagnitude",
+                                     row.get<double> (4));
+                eventDetails.emplace("authoritativeMagnitudeType",
+                                     row.get<std::string> (5));
+                eventDetails.emplace("reviewStatus",
+                                     row.get<std::string> (6));
+                eventDetails.emplace("creationMode",
+                                     row.get<std::string> (7));
+                double lastUpdate = row.get<double> (8);
+                Event event{eventDetails, json};
+                {
+                std::scoped_lock lock(mMutex);
+                if (!mEventsMap.at(schema).contains(sIdentifier))
+                {
+                    spdlog::info("Adding " + sIdentifier);
+                    mEventsMap.at(schema).insert(std::pair {sIdentifier, std::move(event)});
+                }
+                else
+                {
+                    spdlog::info("Updating " + sIdentifier);
+                    mEventsMap[schema].update(std::pair {sIdentifier, std::move(event)});
+                }
+                }
+                newestUpdate = std::max(lastUpdate, newestUpdate);
+                updated = true;
+            }
+            catch (const std::exception &e)
+            {
+                spdlog::warn("Failed to unpack event; failed with: "
+                           + std::string {e.what()});
+            }
+        }
+        if (updated)
+        {
+            mLastUpdateMap[schema] = newestUpdate;
+            // N.B. This can be out of sync with a poller since the events were
+            // updated but the hash wasn't until now.  However, a poller will
+            // loop back around and compare hashes again in due time so this 
+            // problem will resolve itself.
+            mEventsMap.at(schema).generateHash();
+        }
     }
     void start()
     {
@@ -123,6 +213,20 @@ public:
                     std::chrono::system_clock::now().time_since_epoch());
             if (now > mLastQuery + mQueryInterval)
             {
+                // Perform update query
+                for (const auto &schema : mSchemas)
+                {
+                    try
+                    {
+                        updateQuery(schema); 
+                    }
+                    catch (const std::exception &e)
+                    {
+                        spdlog::error("Failed to perform update query on " + schema
+                                    + "; failed with "
+                                    + std::string {e.what()});
+                    }
+                }
                 mLastQuery = now;
             }
             std::this_thread::sleep_for(std::chrono::seconds (1));
@@ -173,9 +277,11 @@ public:
     std::thread mThread;
     std::set<std::string> mSchemas;
     std::map<std::string, Events> mEventsMap;
+    std::map<std::string, double> mLastUpdateMap;
     std::chrono::seconds mLastQuery{0};
     std::chrono::seconds mQueryInterval{5*60};
     std::atomic<bool> mRunning{false};
+    //double mLastUpdate{std::numeric_limits<double>::lowest()};
 };
 
 /// Constructor

@@ -11,6 +11,7 @@
 #include "events.hpp"
 #include "exceptions.hpp"
 #include "authenticator.hpp"
+#include "aqms.hpp"
 #include "base64.hpp"
 
 using namespace CCTService;
@@ -330,7 +331,7 @@ std::string Callback::operator()(
             throw BadRequestException(
                 "eventIdentifier not set in JSON request");
         }
-        spdlog::debug("Performing heavyweight data request for "
+        spdlog::debug("Performing accept for request for "
                     + credentials.user);
         nlohmann::json object;
         auto eventIdentifier
@@ -374,7 +375,7 @@ std::string Callback::operator()(
             throw BadRequestException(
                 "eventIdentifier not set in JSON request");
         }
-        spdlog::debug("Performing heavyweight data request for "
+        spdlog::debug("Performing reject request for "
                     + credentials.user);
         nlohmann::json object;
         auto eventIdentifier
