@@ -1,8 +1,7 @@
-import React from 'react';
 import getEndpoint from '/src/utilities/getEndpoint';
 import { jwtDecode } from 'jwt-decode';
 
-function acceptFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
+function getHeavyWeightDataFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   const apiEndpoint = getEndpoint();
 
   const decodedToken = jwtDecode(jsonToken);
@@ -20,42 +19,40 @@ function acceptFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
     'Content-Type': 'application/json',
     'Authorization': authorizationHeader,
     'Connection': 'close',
-    'Access-Control-Allow-Origin': '*' 
   };
  
-  const acceptRequest = { 
-    request_type: 'accept',
+  const requestData = { 
+    request_type: 'eventData',
     schema: schema,
     eventIdentifier: eventIdentifier
   };  
 
-  { /* console.debug(headers); */ }
-  { /* console.debug(acceptRequest); */ }
-
-  async function handleAcceptRequest() {
+  async function handleGetData() {
     const response
       = await fetch(apiEndpoint, {
-                method: 'POST',
+                method: 'PUT',
                 withCredentials: true,
                 crossorigin: true,
                 headers: headers,
-                body: JSON.stringify(acceptRequest),
+                body: JSON.stringify(requestData),
                 });
     if (!response.ok) {
       const message = `An error has occurred: ${response.status}`;
       throw new Error(message);
     }
 
-    const result = await response.json();
-    return result;
+    const eventData = await response.json();
+    const payload = JSON.parse(eventData.data);
+    console.debug(`Returning heavy event data...`);
+    return payload;
   }
 
   try {
-    return handleAcceptRequest();
+    return handleGetData();
   } catch (error) {
     console.log(error);
     return null;
   }; 
 };
 
-export default acceptFromAPI;
+export default getHeavyWeightDataFromAPI;

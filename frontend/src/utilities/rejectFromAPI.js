@@ -1,4 +1,3 @@
-import React from 'react';
 import getEndpoint from '/src/utilities/getEndpoint';
 import { jwtDecode } from 'jwt-decode';
 
@@ -20,7 +19,6 @@ function rejectFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
     'Content-Type': 'application/json',
     'Authorization': authorizationHeader,
     'Connection': 'close',
-    'Access-Control-Allow-Origin': '*' 
   };
  
   const rejectRequest = { 
@@ -28,9 +26,6 @@ function rejectFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
     schema: schema,
     eventIdentifier: eventIdentifier
   };  
-
-  console.debug(headers);
-  console.debug(rejectRequest);
 
   async function handleRejectRequest() {
     const response

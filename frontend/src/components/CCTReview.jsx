@@ -1,25 +1,56 @@
 import React from 'react';
-import { Box, Center, Container, Flex, HStack, VStack } from '@chakra-ui/react';
-import EventTable from '/src/components/EventTable.jsx';
-import SpectraFit from '/src/components/SpectraFit.jsx';
-import TableFit from '/src/components/TableFit.jsx';
-import Header from '/src/components/Header.jsx';
-import Footer from '/src/components/Footer.jsx';
-{ /* import getAsyncEventData from '/src/utilities/getEventsList.jsx'; */ }
-import getLightWeightEventDataFromAPI from '/src/utilities/getLightWeightDataFromAPI.jsx';
-{ /* import getLightWeightEventDataFromAPI from '/src/utilities/getEventsListFromServer.jsx'; */ }
-{ /* import getAsynchEventDataFromAPI from '/src/utilities/getEventsListFromServer.jsx'; */ }
+import { Box, Center, Container, Flex, VStack } from '@chakra-ui/react';
+import EventTable from '/src/components/EventTable';
+import SpectraFit from '/src/components/SpectraFit';
+import TableFit from '/src/components/TableFit';
+import Header from '/src/components/Header';
+import Footer from '/src/components/Footer';
+import getLightWeightEventDataFromAPI from '/src/utilities/getLightWeightDataFromAPI';
 
 function CCTReview( { userCredentials, onLogout } ) {
-  console.log("Rendering app...");
+  console.debug('Rendering CCTReview...');
   const jsonWebToken = userCredentials.jsonWebToken;
   var [events, setEvents] = React.useState([]);
   var [eventIdentifier,  setEventIdentifier] = React.useState("");
-  var [catalogMagnitude, setCatalogMagnitude] = React.useState( {value: null, type:  null } );
+  //var [catalogMagnitude, setCatalogMagnitude] = React.useState( {value: null, type:  null } );
   var [graphData,        setGraphData] = React.useState( null );
   var [settings,         setSettings] = React.useState( {schema: 'production'} );
 
   const canSubmit = userCredentials.permissions === 'read-write' ? true : false;
+
+  const handleGetEvents = () => {
+    getLightWeightEventDataFromAPI( settings.schema, jsonWebToken, onLogout ).then( (result) => {
+    console.debug(`CCT returned ${result.events.length} events from API`);
+    // Sort the events - most recent first
+    result.events.sort(function (a, b) {
+      if (a.originTime < b.originTime){return +1;}
+      if (a.originTime > b.originTime){return -1;}
+      return 0;
+    }); 
+    var rowIndex = 0;
+    if (eventIdentifier !== "") {
+      for (var i = 0; i < result.events.length; ++i) {
+        if (eventIdentifier === result.events[i].eventIdentifier) {
+          rowIndex = i;
+          break;
+        }
+      }   
+    }   
+    if (result.events.length > 0) {
+      setEvents(result.events);
+      setEventIdentifier(result.events[rowIndex].eventIdentifier);
+      setGraphData(result.events[rowIndex]);
+    }
+    else {
+      setEvents([]);
+      setEventIdentifier("");
+      setGraphData(null);
+    }
+   })
+   .catch(error => {
+     console.error(`Failed to get events from API; failed with ${error}`);
+   });
+  }
 
   {/* When the user clicks the event identifier button in the EventTable */}
   {/* this callback updates the identifier.  The new identifier will */}
@@ -28,47 +59,51 @@ function CCTReview( { userCredentials, onLogout } ) {
   const handleUpdateEventIdentifier = (identifier) => {
     const temporaryIdentifier = eventIdentifier;
     setEventIdentifier((eventIdentifier) = identifier);
-    console.log(`Updated event identifier from ${temporaryIdentifier} to ${eventIdentifier}`);
+    console.debug(`Updated event identifier from ${temporaryIdentifier} to ${eventIdentifier}`);
     const rowIndex = events.findIndex( (row) => row.eventIdentifier === eventIdentifier );
     if (rowIndex >= 0 && rowIndex < events.length) {
-      { /* setGraphData(extractData(events[rowIndex])); */ }
       setGraphData(events[rowIndex]);
     }   
   }
 
   const handleUpdateSettings = (newSettings) => {
     if ( newSettings != settings ) {
-      console.log("Settings updated");
+      var queryEvents = (newSettings.schema != settings.schema) ? true : false;
+      console.debug('Settings updated!');
       setSettings( newSettings ); 
+      if (queryEvents) {
+        settings.schema = newSettings.schema;
+        handleGetEvents();
+        //console.debug(`Fetching events for new schema from ${newSettings.schema}`);
+        //getLightWeightEventDataFromAPI( newSettings.schema, jsonWebToken, onLogout ).then( (result) => {
+        //  console.debug(`CCT returned ${result.events.length} events from API`);
+        //  if (result.events.length > 0) {
+        //    setEventIdentifier(result.events[0].eventIdentifier);
+        //    setGraphData(result.events[0]);
+        //  }
+        //  else {
+        //    setEventIdentifier("");
+        //    setGraphData(null);
+        //  }
+        //  setEvents(result.events);
+        //})
+        //.catch(error => {
+        //  console.error(`Failed to get events from other schema; failed with ${error}`);
+        //  setEvents([]);
+        //});
+      }
+      else {
+        console.debug(`Will not query events from schema ${newSettings.schema}`);
+      }
+    }
+    else {
+      console.debug('Settings not updated');
     }
   };
 
   React.useEffect(() => {
-    { /* getAsyncEventData().then((result) => { */ }
-    { /* console.log(`CCT loaded ${result.events.length} events`); */ }
-    getLightWeightEventDataFromAPI( settings.schema, jsonWebToken, onLogout ).then( (result) => {
-    { /* If this is a reload then try to get back to our current event */ }
-    console.log(`CCT returned ${result.events.length} events from API`);
-    setEvents(result.events);
-    var rowIndex = 0;
-    if (eventIdentifier !== "") {
-      console.log("find index..."); 
-      for (var i = 0; i < result.events.length; ++i) {
-        if (eventIdentifier === result.events[i].eventIdentifier) {
-          rowIndex = i;
-          break;
-        }
-      }
-    }
-    if (result.events.length > 0) {
-      setEventIdentifier(result.events[rowIndex].eventIdentifier);
-      { /* setGraphData(extractData(result.events[rowIndex])); */ }
-      setGraphData(result.events[rowIndex]);
-    }
-   });
+    handleGetEvents();
   }, []);
-
-  { /* getAsynchEventDataFromAPI(); */ }
 
   return (
     <React.Fragment>
@@ -95,6 +130,7 @@ function CCTReview( { userCredentials, onLogout } ) {
                canSubmit={canSubmit}
                eventData={graphData}
                onLogout={onLogout}
+               onAcceptOrRejectEvent={handleGetEvents}
               />
             </Box>
           </Flex>

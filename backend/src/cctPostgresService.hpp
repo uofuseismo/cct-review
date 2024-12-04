@@ -40,6 +40,12 @@ public:
     [[nodiscard]] bool haveSchema(const std::string &schema) const noexcept;
     /// @result The available schemas.
     [[nodiscard]] std::set<std::string> getSchemas() const noexcept; 
+    /// @brief Accepts an event.
+    void acceptEvent(const std::string &schema,
+                     const std::string &eventIdentifier);
+    /// @brief Rejects an event.
+    void rejectEvent(const std::string &schema,
+                     const std::string &eventIdentifier);
     /// @result A reverence to the events.
     //[[nodiscard]] const Events &getEventsReference(const std::string &schema) const;
 

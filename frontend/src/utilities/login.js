@@ -1,6 +1,5 @@
-import React from 'react';
-import axios from 'axios';
-import getEndpoint from '/src/utilities/getEndpoint.jsx';
+//import axios from 'axios';
+import getEndpoint from '/src/utilities/getEndpoint';
 import { encode as base64_encode } from 'base-64';
 
 export default function loginToAPI( user, password, onUpdateUserCredentials ) { 
@@ -15,7 +14,7 @@ export default function loginToAPI( user, password, onUpdateUserCredentials ) {
     schema: null
   };  
 
-  console.debug(authorizationHeader);
+  //console.debug(authorizationHeader);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -38,6 +37,10 @@ export default function loginToAPI( user, password, onUpdateUserCredentials ) {
                 body: null,
                 });
     if (!response.ok) {
+      if (response.status === 403) {
+        console.error(`${user} forbidden; likely invalid password`);
+        return null;
+      }
       const message = `An error has occurred: ${response.status}`;
       throw new Error(message);
     }

@@ -123,7 +123,7 @@ public:
         }
         if (!mConnection->isConnected())
         {
-            spdlog::warn("CCT postgres connection broken");
+            spdlog::critical("CCT postgres connection broken");
             return;
         }
         if (!mLastUpdateMap.contains(schema))
@@ -241,7 +241,7 @@ public:
     {
         setRunning(false);
         if (mThread.joinable()){mThread.join();}
-    } 
+    }
     /// Have event?
     [[nodiscard]] bool haveEvent(const std::string &schema,
                                  const std::string &event) const noexcept
@@ -264,6 +264,73 @@ public:
     {
         std::scoped_lock lock(mMutex);
         return mEventsMap.at(schema).heavyWeightDataToString(eventIdentifier, indent);
+    }
+    /// Accept or reject event
+    [[nodiscard]] bool acceptRejectEvent(const std::string &schema,
+                                         const std::string &eventIdentifier,
+                                         const std::string &reviewStatus)
+    {
+        bool success{true};
+        auto nowMuS
+           = std::chrono::duration_cast<std::chrono::microseconds> (
+             std::chrono::high_resolution_clock::now().time_since_epoch());
+        auto lastUpdate = static_cast<double> (nowMuS.count())*1.e-6;
+        std::string query = "UPDATE "
+                          + schema + ".event SET (review_status, last_update) = (:review_status, TO_TIMESTAMP(:last_update)) WHERE "
+                          + schema + ".event.identifier=:identifier";
+        {
+        std::scoped_lock lock(mMutex);
+        if (!mConnection->isConnected())
+        {
+            spdlog::warn("Reconnecting to CCT postgres");
+            mConnection->connect();
+        }
+        if (!mConnection->isConnected())
+        {
+            spdlog::critical("CCT postgres connection broken");
+            return false;
+        }
+        auto session
+             = reinterpret_cast<soci::session *> (mConnection->getSession());
+        soci::statement statement
+             = (session->prepare << query,
+                                    soci::use(reviewStatus),
+                                    soci::use(lastUpdate),
+                                    soci::use(eventIdentifier));
+        try
+        {
+            statement.execute();
+            success = true;
+        }
+        catch (const std::exception &e)
+        {
+            spdlog::critical(e.what());
+            success = false;
+        }
+        }
+        // Won't matter if we fail - but let's try to update the event data
+        try
+        {
+            updateQuery(schema);
+        }
+        catch (const std::exception &e)
+        {
+            spdlog::warn("Failed to perform update query after accept/reject: "
+                       + std::string {e.what()});
+        }
+        return success;
+    }
+    /// Accept event
+    [[nodiscard]] bool acceptEvent(const std::string &schema,
+                                   const std::string &eventIdentifier)
+    {
+        return acceptRejectEvent(schema, eventIdentifier, "A");
+    }
+    /// Reject event
+    [[nodiscard]] bool rejectEvent(const std::string &schema,
+                                   const std::string &eventIdentifier)
+    {
+        return acceptRejectEvent(schema, eventIdentifier, "R");
     }
     [[nodiscard]] size_t getCurrentHash(const std::string &schema) const
     {
@@ -352,6 +419,46 @@ std::string CCTPostgresService::heavyWeightDataToString(
     const int indent) const
 {
     return pImpl->heavyWeightDataToString(schema, identifier, indent);
+}
+
+/// Accept event
+void CCTPostgresService::acceptEvent(
+    const std::string &schema,
+    const std::string &identifier)
+{
+    if (!haveSchema(schema))
+    {
+        throw std::invalid_argument("Schema " + schema + " does not exist");
+    }
+    if (!haveEvent(schema, identifier))
+    { 
+        throw std::invalid_argument("Event " + identifier
+                                  + " does not exist in schema " + schema);
+    }
+    if (!pImpl->acceptEvent(schema, identifier))
+    {
+        throw std::runtime_error("Failed to accept event " + identifier);
+    }
+}
+
+/// Reject event
+void CCTPostgresService::rejectEvent(
+    const std::string &schema,
+    const std::string &identifier)
+{
+    if (!haveSchema(schema))
+    {
+        throw std::invalid_argument("Schema " + schema + " does not exist");
+    }
+    if (!haveEvent(schema, identifier))
+    {
+        throw std::invalid_argument("Event " + identifier
+                                  + " does not exist in schema " + schema);
+    }
+    if (!pImpl->rejectEvent(schema, identifier))
+    {
+        throw std::runtime_error("Failed to reject event " + identifier);
+    }
 }
 
 size_t CCTPostgresService::getCurrentHash(const std::string &schema) const

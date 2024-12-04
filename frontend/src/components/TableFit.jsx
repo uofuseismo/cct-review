@@ -111,7 +111,7 @@ function FitBadges( {likelyPoorlyConstrained,
   );
 }
 
-function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
+function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcceptOrRejectEvent} ) {
   var [ dataIsRequested,  setDataIsRequested  ] = React.useState( false ); 
   var [ acceptRequested,  setAcceptRequested  ] = React.useState( false );
   var [ rejectRequested,  setRejectRequested  ] = React.useState( false );
@@ -121,6 +121,8 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
   var mwCodaMagnitude = null;
   var catalogMagnitude = null;
   var catalogMagnitudeType = null;
+  var isAccepted = false;
+  var isRejected = false;
   var likelyPoorlyConstrained = false;
   if ( eventData ) {
     eventIdentifier = eventData.eventIdentifier; 
@@ -128,9 +130,22 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
     catalogMagnitude = eventData.authoritativeMagnitude;
     catalogMagnitudeType = eventData.authoritativeMagnitudeType;
     likelyPoorlyConstrained = eventData.likelyPoorlyConstrained;
+    if (eventData.reviewStatus === 'A') {
+      console.debug('Event is accepted');
+      isAccepted = true;
+    }
+    if (eventData.reviewStatus === 'R') {
+      console.debug('Event is rejected');
+      isRejected = true;
+    }
   }
 
-  const url = `https://earthquake.usgs.gov/earthquakes/eventpage/uu${eventIdentifier}/executive`;
+  var url = `https://earthquake.usgs.gov/earthquakes/eventpage/uu${eventIdentifier}/executive`;
+  if ( eventIdentifier != null ) {
+    if ( eventIdentifier[0] === '3' ) {
+      url = `https://staging-earthquake.usgs.gov/earthquakes/eventpage/uu${eventIdentifier}/executive`;
+    }
+  }
   var mwCodaMagnitudeToDisplay = ""; 
   if ( mwCodaMagnitude ) {
     mwCodaMagnitudeToDisplay = mwCodaMagnitude.toFixed(2);
@@ -198,6 +213,10 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
         else {
           console.warn("No data to download");
         }
+      })
+      .catch(error => {
+        setDataIsRequested(false);
+        console.error(`Failed to get heavy weight data from API; failed with ${error}`);
       });
     }
   }
@@ -209,11 +228,21 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
         setAcceptRequested(false);
         if ( jsonData !== null ) {
           if (jsonData.status.toLowerCase() === 'success') {
+            try {
+               onAcceptOrRejectEvent();
+            }
+            catch (error) {
+               console.error(`Failed to update event data after accept; failed with ${error}`);
+            }
             alert('Successfully accepted magnitude');
             return;
           }
         }
         alert('Failed to accept magnitude');
+      })
+      .catch(error => {
+        setAcceptRequested(false);
+        console.error(error);
       });
     }
   }
@@ -225,11 +254,21 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
         setRejectRequested(false);
         if ( jsonData !== null ) { 
           if (jsonData.status.toLowerCase() === 'success') {
+            try {
+               onAcceptOrRejectEvent();
+            }   
+            catch (error) {
+               console.error(`Failed to update event data after accept; failed with ${error}`);
+            }   
             alert('Successfully rejected magnitude');
             return;
           }
         }
         alert('Failed to reject magnitude');
+      })
+      .catch(error => {
+        setAcceptRequested(false);
+        console.error(`Failed to reject magnitude; failed with ${error}`);
       });
     }
   }
@@ -274,7 +313,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
          width='90%'
          colorScheme='green'
          rightIcon={<CheckIcon />}
-         isDisabled={!canSubmit}
+         isDisabled={!canSubmit || isAccepted}
          isLoading={acceptRequested}
          onClick={ () => {
            acceptMagnitude()
@@ -287,7 +326,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout} ) {
          width='90%'
          colorScheme='red'
          rightIcon={<DeleteIcon />} 
-         isDisabled={!canSubmit}
+         isDisabled={!canSubmit || isRejected}
          isLoading={rejectRequested}
          onClick={ () => {
            rejectMagnitude();

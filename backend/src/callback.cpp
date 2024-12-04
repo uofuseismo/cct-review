@@ -229,11 +229,11 @@ std::string Callback::operator()(
     // Schema requests
     if (requestType == "availableSchemas")
     {
-        nlohmann::json object;
-        object["status"] = "success";
-        object["request"] = "availableSchemas";
-        object["availableSchemas"] = pImpl->mCCTPostgresService->getSchemas();
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["availableSchemas"] = pImpl->mCCTPostgresService->getSchemas();
+        return result.dump();
     }
 
     // Lightweight CCT data
@@ -249,10 +249,11 @@ std::string Callback::operator()(
             throw BadRequestException("Invalid schema: " + schema);
         }
         auto hash = pImpl->mCCTPostgresService->getCurrentHash(schema);
-        object["status"] = "success";
-        object["request"] = "hash";
-        object["hash"] = hash;
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["hash"] = hash;
+        return result.dump();
     }
     else if (requestType == "cctData")
     {
@@ -268,14 +269,14 @@ std::string Callback::operator()(
             spdlog::error(schema + " does not exist");
             throw BadRequestException("Invalid schema: " + schema);
         }
-        nlohmann::json object;
+        nlohmann::json result;
         std::string cctData
             = pImpl->mCCTPostgresService->lightWeightDataToString(schema, -1); 
         //std::cout << cctData << std::endl;
-        object["status"] = "success";
-        object["request"] = "cctData";
-        object["events"] = std::move(cctData);
-        return object.dump();
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["events"] = std::move(cctData);
+        return result.dump();
     }
     else if (requestType == "eventData")
     {
@@ -301,7 +302,7 @@ std::string Callback::operator()(
         {
             throw BadRequestException("Invalid schema: " + schema);
         }
-        nlohmann::json object;
+        nlohmann::json result;
         std::string eventData;
         try
         {
@@ -314,11 +315,11 @@ std::string Callback::operator()(
             throw BadRequestException("Invalid event identifier: "
                                     + eventIdentifier); 
         }
-        object["status"] = "success";
-        object["request"] = "eventData"; 
-        object["eventIdentifier"] = eventIdentifier;
-        object["data"] = std::move(eventData);
-        return object.dump();
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        result["data"] = std::move(eventData);
+        return result.dump();
     }
     else if (requestType == "accept")
     {
@@ -333,7 +334,6 @@ std::string Callback::operator()(
         }
         spdlog::debug("Performing accept for request for "
                     + credentials.user);
-        nlohmann::json object;
         auto eventIdentifier
             = object["eventIdentifier"].template get<std::string> (); 
         if (eventIdentifier.empty())
@@ -355,14 +355,34 @@ std::string Callback::operator()(
         else
         {
             spdlog::info("Accepting magnitude for " + eventIdentifier
-                       + " on production machine");
-            status = "success";
+                       + " on " + schema + " schema");
+            try
+            {
+if (schema == "test")
+{
+                pImpl->mCCTPostgresService->acceptEvent(schema, eventIdentifier);
+                status = "success";
+}
+else
+{
+ spdlog::critical("update for prod");
+}
+                status = "success"; 
+            }
+            catch (const std::exception &error)
+            {
+                spdlog::warn("Failed to accept event " + eventIdentifier
+                           + " because " + error.what());
+                reason = "Server error";
+                status = "failure";
+            }
         }
-        object["status"] = status;
-        object["request"] = "accept"; 
-        object["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){object["reason"] = reason;}
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = status;
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){result["reason"] = reason;}
+        return result.dump();
     }
     else if (requestType == "reject")
     {
@@ -377,7 +397,6 @@ std::string Callback::operator()(
         }
         spdlog::debug("Performing reject request for "
                     + credentials.user);
-        nlohmann::json object;
         auto eventIdentifier
             = object["eventIdentifier"].template get<std::string> (); 
         if (eventIdentifier.empty())
@@ -399,14 +418,35 @@ std::string Callback::operator()(
         else
         {
             spdlog::info("Rejecting magnitude for " + eventIdentifier
-                       + " on production machine");
+                       + " in schema " + schema);
+            try
+            {
+if (schema == "test")
+{
+                pImpl->mCCTPostgresService->rejectEvent(schema, eventIdentifier);
+                status = "success";
+}
+else
+{
+ spdlog::critical("update reject for prod");
+status = "success";
+}
+            }
+            catch (const std::exception &error)
+            {
+                spdlog::warn("Failed to reject event " + eventIdentifier
+                           + " because " + error.what());
+                reason = "Server error";
+                status = "failure";
+            }
             status = "success";
         }   
-        object["status"] = status;
-        object["request"] = "reject";
-        object["eventIdentifier"] = eventIdentifier;
-        if (!reason.empty()){object["reason"] = reason;}
-        return object.dump();
+        nlohmann::json result;
+        result["status"] = status;
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        if (!reason.empty()){result["reason"] = reason;}
+        return result.dump();
     }
     throw BadRequestException("Unhandled request type: " + requestType);
 }

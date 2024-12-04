@@ -1,13 +1,13 @@
 import React from 'react';
-import CCTReview from '/src/components/CCTReview.jsx';
+import CCTReview from '/src/components/CCTReview';
 import { Alert, AlertDescription, AlertIcon, AlertTitle } from '@chakra-ui/react'
-import EventTable from '/src/components/EventTable.jsx';
-import SpectraFit from '/src/components/SpectraFit.jsx';
-import TableFit from '/src/components/TableFit.jsx';
-import Header from '/src/components/Header.jsx';
-import Footer from '/src/components/Footer.jsx';
-import Login from '/src/components/Login.jsx';
-import loginToAPI from '/src/utilities/login.jsx';
+import EventTable from '/src/components/EventTable';
+import SpectraFit from '/src/components/SpectraFit';
+import TableFit from '/src/components/TableFit';
+import Header from '/src/components/Header';
+import Footer from '/src/components/Footer';
+import Login from '/src/components/Login';
+import loginToAPI from '/src/utilities/login';
 import { jwtDecode } from 'jwt-decode';
 import '/src/App.css';
 

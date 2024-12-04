@@ -3,6 +3,21 @@ import { Button, Table, TableContainer, Thead, Tbody, Tr, Th, Td } from "@chakra
 
 function EventTable( { events, onUpdateEventIdentifier } ) {
   console.log("Rendering event table...");
+
+  function reviewStatusToString(reviewStatus)
+  {
+    if (reviewStatus === 'U') {
+      return 'Unreviewed';
+    }
+    else if (reviewStatus === 'A') {
+      return 'Accepted';
+    }
+    else if (reviewStatus === 'R') {
+      return 'Rejected';
+    }
+    return 'Unknown';
+  }
+
   return (
     <React.Fragment>
       <TableContainer width='97%' maxHeight='300px' overflowY='auto'>
@@ -37,7 +52,7 @@ function EventTable( { events, onUpdateEventIdentifier } ) {
                <Td>{row.latitude.toFixed(4)}</Td>
                <Td>{row.longitude.toFixed(4)}</Td>
                <Td>{row.depth.toFixed(2)}</Td>
-               <Td>{row.reviewStatus}</Td>
+               <Td>{reviewStatusToString(row.reviewStatus)}</Td>
              </Tr>
             ))
            }

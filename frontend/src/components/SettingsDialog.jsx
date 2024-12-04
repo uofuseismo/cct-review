@@ -7,10 +7,16 @@ import { Radio, RadioGroup, Stack } from '@chakra-ui/react';
 
 
 function SettingsDialog( {settings, onUpdateSettings, onLogout} ) {
-  console.log("Rendering settings dialog");
-  console.log(settings);
+  console.debug("Rendering settings dialog...");
   const [ schema, setSchema ] = React.useState( settings.schema );
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+   
+  function switchSchema() {
+    if (settings.schema != schema) {
+      onUpdateSettings({...settings, schema: schema});
+    }
+  }
 
   return (
     <React.Fragment>
@@ -45,11 +51,7 @@ function SettingsDialog( {settings, onUpdateSettings, onLogout} ) {
             </Button>
             <Button
              variant='ghost'
-             onClick={() => {
-                      console.log(`Updating schema to: ${schema}...`);
-                      onUpdateSettings( {schema : {schema} });
-                      {onClose}
-                     }}
+             onClick={() => switchSchema()}
             >
               Update
             </Button>
