@@ -48,7 +48,7 @@ public:
             return;
         }
         mEvents[event.first] = std::move(event.second);
-    } 
+    }
     void generateHash()
     {
         if (mEvents.empty())

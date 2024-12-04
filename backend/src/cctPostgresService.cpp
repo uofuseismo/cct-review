@@ -96,7 +96,6 @@ public:
                                      row.get<std::string> (7));
                 double lastUpdate = row.get<double> (8);
                 newestUpdate = std::max(lastUpdate, newestUpdate);
-                //std::cout << std::setw(4) << eventDetails << std::endl;
                 Event event{eventDetails, json};
                 {
                 std::scoped_lock lock(mMutex);
@@ -140,6 +139,7 @@ public:
               + " WHERE " + schema + ".event.last_update > TO_TIMESTAMP(" + std::to_string(newestUpdate) + ") "
               + " ORDER BY load_date DESC");
         bool updated{false};
+        //std::cout << std::setprecision(16) << schema << " " << newestUpdate << std::endl;
         for (soci::rowset<soci::row>::const_iterator it = rows.begin();
              it != rows.end();
              ++it)
@@ -165,19 +165,23 @@ public:
                 eventDetails.emplace("creationMode",
                                      row.get<std::string> (7));
                 double lastUpdate = row.get<double> (8);
-                Event event{eventDetails, json};
+                //Event event{eventDetails, json};
+                std::pair<std::string, Event>
+                    valueToAddOrInsert{sIdentifier, 
+                                       Event {eventDetails, json}};
                 {
                 std::scoped_lock lock(mMutex);
                 if (!mEventsMap.at(schema).contains(sIdentifier))
                 {
                     spdlog::info("Adding " + sIdentifier);
-                    mEventsMap.at(schema).insert(std::pair {sIdentifier, std::move(event)});
+                    mEventsMap.at(schema).insert(std::move(valueToAddOrInsert));
                 }
                 else
                 {
                     spdlog::info("Updating " + sIdentifier);
-                    mEventsMap[schema].update(std::pair {sIdentifier, std::move(event)});
+                    mEventsMap[schema].update(std::move(valueToAddOrInsert));
                 }
+                mEventsMap.at(schema).generateHash();
                 }
                 newestUpdate = std::max(lastUpdate, newestUpdate);
                 updated = true;
@@ -191,11 +195,6 @@ public:
         if (updated)
         {
             mLastUpdateMap[schema] = newestUpdate;
-            // N.B. This can be out of sync with a poller since the events were
-            // updated but the hash wasn't until now.  However, a poller will
-            // loop back around and compare hashes again in due time so this 
-            // problem will resolve itself.
-            mEventsMap.at(schema).generateHash();
         }
     }
     void start()
@@ -346,7 +345,7 @@ public:
     std::map<std::string, Events> mEventsMap;
     std::map<std::string, double> mLastUpdateMap;
     std::chrono::seconds mLastQuery{0};
-    std::chrono::seconds mQueryInterval{5*60};
+    std::chrono::seconds mQueryInterval{1*60};
     std::atomic<bool> mRunning{false};
     //double mLastUpdate{std::numeric_limits<double>::lowest()};
 };
