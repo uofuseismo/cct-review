@@ -48,7 +48,7 @@ function rejectFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   try {
     return handleRejectRequest();
   } catch (error) {
-    console.log(error);
+    console.log(`Failed to reject event because ${error}`);
     return null;
   }; 
 };

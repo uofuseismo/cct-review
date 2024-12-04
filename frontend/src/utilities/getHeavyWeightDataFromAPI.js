@@ -50,7 +50,7 @@ function getHeavyWeightDataFromAPI( schema, jsonToken, eventIdentifier, handleLo
   try {
     return handleGetData();
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return null;
   }; 
 };

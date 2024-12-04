@@ -48,15 +48,13 @@ function getLightWeightEventDataFromAPI( schema, jsonToken, handleLogout ) {
     const eventData = await response.json();
     eventData.events = JSON.parse(eventData.events);
     console.debug(`Returning event data...`);
-    console.log(typeof (eventData.events) );
-    console.log(eventData.events);
     return eventData;
   } 
 
   try {
     return handleGetData();
   } catch (error) {
-    console.log(error);
+    console.error(error);
     var eventData = { events: null };
     return eventData;
   };

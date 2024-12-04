@@ -1,11 +1,25 @@
 #ifndef AQMS_HPP
 #define AQMS_HPP
 #include <string>
+#include <optional>
 
 #define MAGNITUDE_TYPE "w"
 #define AUTHORITY "UU"
 #define MAGNITUDE_SUBSOURCE "cct"
 #define MAGNITUDE_ALGORITHM "LLNLCCT"
+
+/// Do not commit in epref.insertNetMag; will happen later
+#define EPREF_INSERTNETMAG_COMMIT 0
+
+/// Do not bypass magpref rules on epref.setprefmag_magtype
+#define EPREF_SETPREFMAG_MAGTYPE_BYPASS_MAGPREF_RULES 0 
+/// Do not bump the event version in epref.setprefmag_magtype
+#define EPREF_SETPREFMAG_MAGTYPE_BUMP_EVENT_VERSION 0
+/// Do not commit in epref.setprefmag_magtype; will happen later
+#define EPREF_SETPREFMAG_MAGTYPE_COMMIT 0
+
+/// Do not commit in magpref.setPrefMagOfEvent
+#define MAGPREF_SETPREFMAGOFEVENT_COMMIT 0 
 
 namespace CCTService
 {

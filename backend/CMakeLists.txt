@@ -58,6 +58,7 @@ add_executable(cctReviewService
                src/authenticator.cpp
                src/permissions.cpp
                src/postgresql.cpp
+               src/aqmsPostgresHandler.cpp
                src/cctPostgresService.cpp)
 
 target_link_libraries(cctReviewService

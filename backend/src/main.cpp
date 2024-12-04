@@ -111,6 +111,13 @@ std::shared_ptr<CCTService::CCTPostgresService> createCCTPostgresService(
     return service;
 }
 
+/*
+std::shared_ptr<CCTService::AQMSPostgresService> createAQMSPostgresService()
+{
+
+}
+*/
+
 int main(int argc, char* argv[])
 {
     ::ProgramOptions programOptions;

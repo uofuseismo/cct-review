@@ -48,7 +48,7 @@ function acceptFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   try {
     return handleAcceptRequest();
   } catch (error) {
-    console.log(error);
+    console.log(`Failed to accept event because ${error}`);
     return null;
   }; 
 };
