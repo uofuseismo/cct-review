@@ -33,7 +33,7 @@ public:
         Human
     };
 public:
-    NetMag();
+    NetMag() = default;
     NetMag(const NetMag &netmag) = default;
     NetMag(NetMag &&netmag) noexcept = default;
     NetMag& operator=(const NetMag &netmag) = default;
@@ -213,17 +213,28 @@ public:
                std::optional<double> (mDistance) : std::nullopt;
     }
    
+    void setMagnitudeAlgorithm(const std::string &algorithm)
+    {
+        mMagnitudeAlgorithm = algorithm;
+    }
+    [[nodiscard]] std::optional<std::string> getMagnitudeAlgorithm() const noexcept
+    {
+        return !mMagnitudeAlgorithm.empty() ?
+               std::optional<std::string> (mMagnitudeAlgorithm) :
+               std::nullopt;
+    }
 private:
     std::string mSubSource{MAGNITUDE_SUBSOURCE}; 
     std::string mAuthority{AUTHORITY};
     std::string mMagnitudeType{MAGNITUDE_TYPE};
+    std::string mMagnitudeAlgorithm{MAGNITUDE_ALGORITHM};
     int64_t mIdentifier{0};
     int64_t mOriginIdentifier{0};
-    int mStationCount{-1};
-    int mObservationCount{-1};
     double mMagnitude{0};
     double mGap{-1};
     double mDistance{-1};
+    int mStationCount{-1};
+    int mObservationCount{-1};
     ReviewFlag mReviewFlag{ReviewFlag::Human};
     bool mHaveIdentifier{false};
     bool mHaveOriginIdentifier{false};

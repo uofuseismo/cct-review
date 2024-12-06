@@ -20,6 +20,7 @@ find_package(spdlog REQUIRED)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(Boost COMPONENTS program_options date_time REQUIRED)
 #find_package(jwt-cpp 0.7.0...2.0 REQUIRED)
+find_package(GeographicLib REQUIRED)
 find_package(PostgreSQL REQUIRED)
 find_package(OpenLdap REQUIRED)
 find_package(Catch2 3)
@@ -58,7 +59,7 @@ add_executable(cctReviewService
                src/authenticator.cpp
                src/permissions.cpp
                src/postgresql.cpp
-               src/aqmsPostgresHandler.cpp
+               src/aqmsPostgresClient.cpp
                src/cctPostgresService.cpp)
 
 target_link_libraries(cctReviewService
@@ -68,6 +69,7 @@ target_link_libraries(cctReviewService
                               spdlog::spdlog
                               nlohmann_json::nlohmann_json
                               jwt-cpp::jwt-cpp
+                              GeographicLib::GeographicLib
                               ${LDAP_LIBRARY} ${LBER_LIBRARY})
 target_include_directories(cctReviewService
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src

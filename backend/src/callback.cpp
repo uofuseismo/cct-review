@@ -1,11 +1,15 @@
 #include <string>
 #include <map>
+#include <cmath>
 #include <iostream>
 #include <functional>
 #include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <GeographicLib/Geodesic.hpp>
+#include <GeographicLib/Constants.hpp>
 #include "cctPostgresService.hpp"
+#include "aqmsPostgresClient.hpp"
 #include "callback.hpp"
 #include "permissions.hpp"
 #include "events.hpp"
@@ -15,6 +19,250 @@
 #include "base64.hpp"
 
 using namespace CCTService;
+
+namespace
+{
+
+void distaz(const GeographicLib::Geodesic &geodesic,
+            const std::pair<double, double> &sourceLatitudeAndLongitude,
+            const std::pair<double, double> &stationLatitudeAndLongitude,
+            double &greatCircleDistance,
+            double &distance,
+            double &azimuth,
+            double &backAzimuth)
+{
+    try 
+    {   
+        // These will throw
+        auto sourceLatitude = sourceLatitudeAndLongitude.first;
+        auto sourceLongitude = sourceLatitudeAndLongitude.second;
+        auto stationLatitude = stationLatitudeAndLongitude.first;
+        auto stationLongitude = stationLatitudeAndLongitude.second;
+        // Do calculation
+        //GeographicLib::Geodesic geodesic{GeographicLib::Constants::WGS84_a(),
+        //                                 GeographicLib::Constants::WGS84_f()};
+        greatCircleDistance
+            = geodesic.Inverse(sourceLatitude, sourceLongitude,
+                               stationLatitude, stationLongitude,
+                               distance, azimuth, backAzimuth);
+        // Translate azimuth from [-180,180] to [0,360].
+        if (azimuth < 0){azimuth = azimuth + 360;}
+        // Translate azimuth from [-180,180] to [0,360] then convert to a
+        // back-azimuth by subtracting 180, i.e., +180.
+        backAzimuth = backAzimuth + 180;
+    }   
+    catch (const std::exception &e) 
+    {   
+        throw std::runtime_error("Vincenty failed with: "
+                               + std::string {e.what()});
+    }   
+}
+
+void computeDistanceAndAzimuth(
+    const std::pair<double, double> &sourceLatitudeAndLongitude,
+    const std::map<std::string, std::pair<double, double>> &stationLocations,
+    double &closestDistanceKM,
+    double &gap)
+{
+    // Nothign to do
+    if (stationLocations.empty())
+    {
+        closestDistanceKM =-1;
+        gap =-1;
+        return;
+    }
+    // Compute distance and azimuth for every station
+    GeographicLib::Geodesic geodesic{GeographicLib::Constants::WGS84_a(),
+                                    GeographicLib::Constants::WGS84_f()};
+    closestDistanceKM = std::numeric_limits<double>::max();
+    std::vector<double> backAzimuths;
+    for (const auto &stationLocation : stationLocations)
+    {
+        double greatCircleDistance, distanceMeters, azimuth, backAzimuth;
+        // Throws - if any station fails then the results are shoddy
+        // so this function fails
+        ::distaz(geodesic, 
+                 sourceLatitudeAndLongitude,
+                 stationLocation.second,
+                 greatCircleDistance,
+                 distanceMeters,
+                 azimuth,
+                 backAzimuth);
+        double distanceKM = distanceMeters*1.e-3;
+        closestDistanceKM = std::min(closestDistanceKM, distanceKM);
+        backAzimuths.push_back(backAzimuth);
+    }
+    // Compute the gap
+    gap =-1;
+    if (!backAzimuths.empty())
+    {
+        gap = 360; // One station
+        if (backAzimuths.size() > 1)
+        {
+            gap = 0;
+            std::sort(backAzimuths.begin(), backAzimuths.end());
+            backAzimuths.push_back(backAzimuths[0] + 360);
+            for (int i = 0; i < static_cast<int> (backAzimuths.size() - 1); ++i) 
+            {
+                gap = std::max(gap, backAzimuths.at(i + 1) - backAzimuths.at(i));
+            }
+        }
+    }
+}
+
+/*
+std::optional<int> getNumberOfStations(
+    const ::Event &event, const std::string &identifier)
+{
+    if (event.mFullData.contains("measuredMwDetails"))
+    {
+        const auto &measuredMwDetails 
+            = event.mFullData["measuredMwDetails"]; 
+        if (measuredMwDetails.contains(identifier))
+        {
+            const auto &measuredMwDetailsForEvent
+                = measuredMwDetails[identifier];
+            if (measuredMwDetailsForEvent.contains("stationCount"))
+            {
+                auto nStations
+                    = measuredMwDetailsForEvent["stationCount"].template
+                      get<int> ();
+                if (nStations > 0){return std::optional<int> (nStations);}
+            }
+        }
+    }
+    return std::nullopt;
+}
+*/
+
+void getMagnitudeDistanceAzimuthAndNumberOfStations(
+    const ::Event &event, const std::string &identifier,
+    double &magnitude,
+    double &closestDistanceKM,
+    double &azimuthalGap,
+    int &nStations,
+    int &nObservations)
+{
+    magnitude =-10;
+    closestDistanceKM =-1;
+    azimuthalGap =-1;
+    nStations =-1;
+    nObservations =-1;
+    std::map<std::string, std::pair<double, double>> stationLocations; 
+    std::pair<double, double> eventLocation;
+    bool haveEventLocation{false};
+    if (event.mFullData.contains("measuredMwDetails"))
+    {
+        const auto &measuredMwDetails 
+            = event.mFullData["measuredMwDetails"]; 
+        if (measuredMwDetails.contains(identifier))
+        {
+            const auto &measuredMwDetailsForEvent
+                = measuredMwDetails[identifier];
+            if (!measuredMwDetailsForEvent.contains("mw"))
+            {
+                throw std::runtime_error("mw not set");
+            }
+            magnitude
+                 = measuredMwDetailsForEvent["mw"].template get<double> ();
+            if (measuredMwDetailsForEvent.contains("stationCount"))
+            {
+                nStations
+                    = measuredMwDetailsForEvent["stationCount"].template
+                      get<int> (); 
+            }
+            if (measuredMwDetailsForEvent.contains("latitude") &&
+                measuredMwDetailsForEvent.contains("longitude"))
+            {
+                auto latitude = measuredMwDetailsForEvent["latitude"].template get<double> ();
+                auto longitude = measuredMwDetailsForEvent["longitude"].template get<double> ();
+                if (latitude >= -90 && latitude <= 90)
+                {
+                    eventLocation = std::pair {latitude, longitude};
+                    //std::cout << latitude << " " << longitude << std::endl;
+                    haveEventLocation = true;
+                }
+            }
+        }
+    }
+    int observationCounter{0};
+    if (event.mFullData.contains("spectraMeasurements"))
+    {
+        const auto &spectraMeasurements
+            = event.mFullData["spectraMeasurements"];
+        if (spectraMeasurements.contains(identifier))
+        {
+            for (const auto &measurement :
+                 spectraMeasurements[identifier])
+            {
+                if (measurement.contains("pathAndSiteCorrected"))
+                {
+                    if (measurement["pathAndSiteCorrected"].is_number())
+                    {
+                        observationCounter = observationCounter + 1;
+                    }
+                }
+                if (measurement.contains("waveform"))
+                {
+                    const auto &waveform = measurement["waveform"];
+                    if (waveform.contains("stream"))
+                    {
+                        const auto &stream = waveform["stream"];
+                        if (stream.contains("station"))
+                        {
+                            const auto &station = stream["station"];
+                            if (station.contains("latitude") &&
+                                station.contains("longitude") &&
+                                station.contains("networkName") &&
+                                station.contains("stationName"))
+                            {
+                                auto name = station["networkName"].template get<std::string> ()
+                                          + "."
+                                          + station["stationName"].template get<std::string> ();
+                                auto latitude = station["latitude"].template get<double> ();
+                                auto longitude = station["longitude"].template get<double> ();
+                                if (!stationLocations.contains(name) &&
+                                    (latitude >=-90 && latitude <= 90))
+                                {
+                                    stationLocations.insert(std::pair {name, std::pair {latitude, longitude}});
+                                    // std::cout << name <<  " " << latitude << " " << longitude << std::endl;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (observationCounter >= 0){nObservations = observationCounter;}
+    // Warning - I guess the mwMeasured details are authorative?
+    if (nStations != stationLocations.size())
+    {
+        spdlog::warn("Number of stations differs form stationLocations.size()");
+    }
+    // Throws - but these aren't essential things so eat the error
+    if (haveEventLocation)
+    {
+        try
+        {
+            ::computeDistanceAndAzimuth(eventLocation,
+                                        stationLocations,
+                                        closestDistanceKM,
+                                        azimuthalGap);
+        }
+        catch (const std::exception &e)
+        {
+            spdlog::warn("Failed to get distance/azimuth because " 
+                       + std::string {e.what()});
+        }
+    }
+    else
+    {
+        spdlog::warn("Could not extract event location from JSON");
+    }
+}
+
+}
 
 class Callback::CallbackImpl
 {
@@ -104,12 +352,22 @@ public:
                                const std::string &,
                                const boost::beast::http::verb)> mCallbackFunction;
     std::shared_ptr<CCTPostgresService> mCCTPostgresService{nullptr};
+    std::shared_ptr<
+       std::map<std::string, std::unique_ptr<CCTService::AQMSPostgresClient>>
+    > mAQMSClients{nullptr};
     std::shared_ptr<CCTService::IAuthenticator> mAuthenticator{nullptr};
+    std::string mAuthority{"UU"};
+    std::string mSubSource{"cct"};
+    std::string mAlgorithm{"LLNLCCT"};
 };
 
 /// @brief Constructor.
-Callback::Callback(std::shared_ptr<CCTPostgresService> &cctEventsService,
-                   std::shared_ptr<CCTService::IAuthenticator> authenticator) :
+Callback::Callback(
+    std::shared_ptr<CCTPostgresService> &cctEventsService,
+    std::shared_ptr<
+       std::map<std::string, std::unique_ptr<CCTService::AQMSPostgresClient>>
+    > &aqmsClients,
+    std::shared_ptr<CCTService::IAuthenticator> &authenticator) :
     pImpl(std::make_unique<CallbackImpl> ())
 {
     if (cctEventsService == nullptr)
@@ -120,9 +378,22 @@ Callback::Callback(std::shared_ptr<CCTPostgresService> &cctEventsService,
     {
         throw std::runtime_error("CCT event service is not running");
     }
+    if (aqmsClients == nullptr)
+    {
+        throw std::invalid_argument("AQMS clients map is NULL");
+    }
     if (authenticator == nullptr)
     {
         throw std::invalid_argument("Authenticator is NULL");
+    }
+    auto schemas = cctEventsService->getSchemas();
+    for (const auto &schema : schemas)
+    {
+        if (!aqmsClients->contains(schema))
+        {
+            throw std::invalid_argument(
+                schema + " does not have an AQMS postgres client");
+        }
     }
     pImpl->mCallbackFunction
         = std::bind(&Callback::operator(),
@@ -131,6 +402,7 @@ Callback::Callback(std::shared_ptr<CCTPostgresService> &cctEventsService,
                     std::placeholders::_2,
                     std::placeholders::_3);
     pImpl->mCCTPostgresService = cctEventsService;
+    pImpl->mAQMSClients = aqmsClients;
     pImpl->mAuthenticator = authenticator;
 }
 
@@ -360,6 +632,81 @@ std::string Callback::operator()(
             {
 if (schema == "test")
 {
+                auto eventDetails
+                    = pImpl->mCCTPostgresService->getEvent(schema,
+                                                           eventIdentifier);
+                //auto nStations
+                //    = ::getNumberOfStations(eventDetails, eventIdentifier);
+                int nStations{-1};
+                int nObservations{-1};
+                double magnitude{-10};
+                double closestDistanceKM{-1};
+                double azimuthalGap{-1};
+                try
+                {
+                    ::getMagnitudeDistanceAzimuthAndNumberOfStations(
+                        eventDetails, eventIdentifier,
+                        magnitude,
+                        closestDistanceKM, 
+                        azimuthalGap,
+                        nStations,
+                        nObservations);
+                }
+                catch (const std::exception &e)
+                {
+                     closestDistanceKM =-1;
+                     azimuthalGap =-1;
+                     spdlog::warn(e.what());
+                }
+                // Figure out the necessary AQMS details
+                auto originIdentifier
+                   = pImpl->mAQMSClients->at(schema)
+                          ->getPreferredOriginIdentifier(eventIdentifier);
+                CCTService::NetMag networkMagnitude;
+                //networkMagnitude.setIdentifier(); // Can be set during insert
+                networkMagnitude.setOriginIdentifier(originIdentifier);
+                networkMagnitude.setMagnitude(magnitude);
+                networkMagnitude.setMagnitudeType("w");
+                networkMagnitude.setAuthority(pImpl->mAuthority);
+                networkMagnitude.setReviewFlag(NetMag::ReviewFlag::Human);
+                if (nStations >= 0)
+                {
+                    networkMagnitude.setNumberOfStations(nStations);
+                }
+                if (nObservations >= 0)
+                {
+                    networkMagnitude.setNumberOfObservations(nObservations);
+                }
+                if (azimuthalGap >= 0 && azimuthalGap < 360)
+                {
+                    networkMagnitude.setGap(azimuthalGap);
+                }
+                if (closestDistanceKM >= 0)
+                {
+                    networkMagnitude.setDistance(closestDistanceKM);
+                }
+                // Update or insert?
+                auto existingMagnitudeIdentifier
+                    = pImpl->mAQMSClients->at(schema)
+                                         ->getMwCodaMagnitudeIdentifier(eventIdentifier);
+                if (existingMagnitudeIdentifier)
+                {
+                    spdlog::info("Will attempt to update Mw,coda magnitude for "
+                               + eventIdentifier + " for user " + credentials.user);
+                    networkMagnitude.setIdentifier(*existingMagnitudeIdentifier);
+                }
+                else
+                {
+                    spdlog::info("Will attempt to create Mw,coda magnitude for "
+                               + eventIdentifier + " for user " + credentials.user);
+/*
+                    pImpl->mAQMSClients->at(schema)
+                         ->insertNetworkMagnitude(credentials.user,
+                                                  eventIdentifier,
+                                                  networkMagnitude);
+*/
+                }
+//spdlog::info(originIdentifier);
                 pImpl->mCCTPostgresService->acceptEvent(schema, eventIdentifier);
                 status = "success";
 }

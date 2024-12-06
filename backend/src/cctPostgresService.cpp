@@ -337,6 +337,13 @@ public:
         std::scoped_lock lock(mMutex);
         return mEventsMap.at(schema).getHash();
     }
+    /// Get event
+    [[nodiscard]] Event getEvent(const std::string &schema,
+                                 const std::string &eventIdentifier) const
+    {
+        std::scoped_lock lock(mMutex);
+        return mEventsMap.at(schema).at(eventIdentifier);
+    }
 //private:
     mutable std::mutex mMutex;
     std::unique_ptr<PostgreSQL> mConnection{nullptr};
@@ -401,6 +408,22 @@ std::set<std::string> CCTPostgresService::getSchemas() const noexcept
 bool CCTPostgresService::haveSchema(const std::string &schema) const noexcept
 {
     return pImpl->mSchemas.contains(schema);
+}
+
+/// Get event reference
+Event CCTPostgresService::getEvent(
+    const std::string &schema, const std::string &identifier) const 
+{
+    if (!haveSchema(schema))
+    {
+        throw std::invalid_argument("Schema " + schema + " does not exist");
+    }
+    if (!haveEvent(schema, identifier))
+    {
+        throw std::invalid_argument(identifier
+                                  + " does not exist in " + schema);
+    }
+    return pImpl->getEvent(schema, identifier);
 }
 
 /// Lightweight data

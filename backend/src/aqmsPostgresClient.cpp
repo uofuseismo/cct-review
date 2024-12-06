@@ -1,0 +1,444 @@
+#include <soci/soci.h>
+#include <spdlog/spdlog.h>
+#include "aqmsPostgresClient.hpp"
+#include "postgresql.hpp"
+#include "aqms.hpp"
+
+using namespace CCTService;
+
+namespace
+{
+
+/// Gets the next sequence value
+int64_t getNextSequenceValue(soci::session &session,
+                             const std::string &sequenceName = "magseq")
+{
+    if (sequenceName.empty())
+    {
+        throw std::invalid_argument("sequenceName is empty");
+    }
+    int64_t sequenceValue{-1};
+    try
+    {
+        {
+        soci::transaction tr(session);
+        session << "SELECT sequence.getNext(:sequenceName, 1)",
+                   soci::use(sequenceName),
+                   soci::into(sequenceValue);
+        tr.commit();
+        }
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::warn(e.what());
+    }
+    if (sequenceValue < 0)
+    {
+        throw std::runtime_error("Failed to get sequence value for "
+                               + sequenceName);
+    }
+    return sequenceValue;
+}
+
+int64_t convertEventIdentifier(const std::string &eventIdentifier)
+{
+    if (eventIdentifier.empty())
+    {   
+        throw std::invalid_argument("Event identifier is empty");
+    }   
+    int64_t identifier{-1};
+    try 
+    {   
+        identifier = std::stol(eventIdentifier);    
+    }   
+    catch (...)
+    {   
+        try
+        {
+            // Might be in form of uu8238239 so pop uu
+            auto temporaryIdentifier = eventIdentifier;
+            if (temporaryIdentifier.size() > 2)
+            {
+                temporaryIdentifier.erase(0, 2); 
+            }
+            identifier = std::stol(temporaryIdentifier);
+        }
+        catch (const std::exception &e) 
+        {
+            throw std::invalid_argument("Could not convert "
+                                      + eventIdentifier + " to an integer");
+        }
+    }   
+    if (identifier < 0)
+    {   
+        throw std::invalid_argument("Could not convert "
+                                  + eventIdentifier + " to an integer");
+    }   
+    return identifier;
+}
+
+}
+
+class AQMSPostgresClient::AQMSPostgresClientImpl
+{
+public:
+    explicit AQMSPostgresClientImpl(std::unique_ptr<PostgreSQL> &&connection)
+    {
+        if (connection == nullptr)
+        {
+            throw std::invalid_argument("AQMS database connection is NULL");
+        }
+        mConnection = std::move(connection);
+    }
+    std::unique_ptr<PostgreSQL> mConnection{nullptr};
+};
+
+/// Constructor
+AQMSPostgresClient::AQMSPostgresClient(
+    std::unique_ptr<PostgreSQL> &&connection) :
+    pImpl(std::make_unique<AQMSPostgresClientImpl> (std::move(connection)))
+{
+}
+
+/// Insert the network magnitude
+void AQMSPostgresClient::insertNetworkMagnitude(
+    const std::string &user,
+    const std::string &eventIdentifier,
+    const NetMag &networkMagnitude)
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    insertNetworkMagnitude(user, identifier, networkMagnitude);
+}
+
+void AQMSPostgresClient::insertNetworkMagnitude(
+    const std::string &user,
+    const int64_t eventIdentifier,
+    const NetMag &networkMagnitudeIn)
+{
+    if (mwCodaMagnitudeExists(eventIdentifier))
+    {
+        throw std::invalid_argument("Mw,Coda netmag already exists for "
+                                  + std::to_string (eventIdentifier));
+    }
+
+    // Make sure I have a magnitude identifier and a few other
+    // things I can figure out on the fly
+    auto session
+         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    auto networkMagnitude = networkMagnitudeIn;
+    /*
+    if (!networkMagnitude.haveIdentifier())
+    {
+        auto magnitudeIdentifier
+            = ::getNextSequenceValue(*session, "magseq");
+        networkMagnitude.setIdentifier(magnitudeIdentifier);
+    }
+    */
+    if (!networkMagnitude.haveOriginIdentifier())
+    {
+        auto originIdentifier
+            = getPreferredOriginIdentifier(eventIdentifier);
+    }
+    if (!networkMagnitude.haveMagnitudeType())
+    {   
+        networkMagnitude.setMagnitudeType(MAGNITUDE_TYPE);
+    }
+    if (!networkMagnitude.haveSubSource())
+    {
+        networkMagnitude.setSubSource(MAGNITUDE_SUBSOURCE);
+    }
+    if (!networkMagnitude.haveMagnitude())
+    {
+        throw std::invalid_argument("Magnitude not set");
+    }
+    if (!networkMagnitude.haveAuthority())
+    {
+        throw std::invalid_argument("Authority not set");
+    }
+
+    // Get values for insertNetMag function
+    int nStationsInsert{-1};
+    auto nStations = networkMagnitude.getNumberOfStations();
+    soci::indicator nStationsIndicator{soci::i_null};
+    if (nStations)
+    {
+        nStationsInsert = *nStations;
+        nStationsIndicator = soci::indicator::i_ok;
+    }
+
+    int nObservationsInsert{-1};
+    auto nObservations = networkMagnitude.getNumberOfObservations();
+    soci::indicator nObservationsIndicator{soci::i_null};
+    if (nObservations)
+    {
+        nObservationsInsert = *nObservations;
+        nObservationsIndicator = soci::indicator::i_ok;
+    }
+
+    double gapInsert{-1};
+    auto gap = networkMagnitude.getGap();
+    soci::indicator gapIndicator{soci::i_null};
+    if (gap)
+    {
+        gapInsert = *gap;
+        gapIndicator = soci::indicator::i_ok;
+    }
+
+    double distanceInsert{-1};
+    auto distance = networkMagnitude.getDistance();
+    soci::indicator distanceIndicator{soci::i_null};
+    if (distance)
+    {
+        distanceInsert = *distance;
+        distanceIndicator = soci::indicator::i_ok;
+    }
+
+    std::string magAlgo;
+    auto magnitudeAlgorithm = networkMagnitude.getMagnitudeAlgorithm();
+    soci::indicator magnitudeAlgorithmIndicator{soci::i_null};
+    if (magnitudeAlgorithm)
+    {
+        magAlgo = *magnitudeAlgorithm;
+        magnitudeAlgorithmIndicator = soci::i_ok;
+    }
+
+    auto reviewFlag = networkMagnitude.getReviewFlag();
+    std::string stringReviewFlag;
+    soci::indicator reviewFlagIndicator{soci::i_null};
+    if (reviewFlag)
+    {
+        if (*reviewFlag == NetMag::ReviewFlag::Human)
+        {
+            stringReviewFlag = "H";
+        }
+        else if (*reviewFlag == NetMag::ReviewFlag::Automatic)
+        {
+            stringReviewFlag = "A";
+        }
+        else
+        {
+            spdlog::warn("Unhandled review flag");
+        }
+    }
+    if (!stringReviewFlag.empty()){reviewFlagIndicator = soci::i_ok;}
+     
+    // Let the commit fun begin
+    {
+    soci::transaction tr(*session);
+    soci::indicator nullIndicator{soci::i_null};
+    int64_t magnitudeIdentifier{0};
+    const double uncertainty{0};
+    const double quality{0};
+    constexpr int commit{0};
+    std::string insertNetMagQuery{
+R"'''(
+SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta, :nobs, :uncertainty, :gap, :dist, :quality, :rflag, :commit)
+)'''"
+    };
+    *session << insertNetMagQuery,
+                soci::use(networkMagnitude.getOriginIdentifier()),
+                soci::use(networkMagnitude.getMagnitude()),
+                soci::use(networkMagnitude.getMagnitudeType()),
+                soci::use(networkMagnitude.getAuthority()),
+                soci::use(networkMagnitude.getSubSource()),
+                soci::use(magAlgo, magnitudeAlgorithmIndicator),
+                soci::use(nStationsInsert, nStationsIndicator),
+                soci::use(nObservationsInsert, nObservationsIndicator),
+                soci::use(uncertainty, nullIndicator),
+                soci::use(gapInsert, gapIndicator),
+                soci::use(distanceInsert, distanceIndicator),
+                soci::use(quality, nullIndicator),
+                soci::use(stringReviewFlag, reviewFlagIndicator),
+                soci::use(commit),
+                soci::into(magnitudeIdentifier);
+
+    std::string setPrefMagTypeQuery{
+R"'''(
+SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
+)'''"
+    };
+    const int bypassMagPrefRules{0}; // Don't bypass magpref rules
+    const int bumpEventVersion{0}; // Don't bump event version
+    *session << setPrefMagTypeQuery,
+                soci::use(eventIdentifier),
+                soci::use(magnitudeIdentifier), //networkMagnitude.getIdentifier()),
+                soci::use(bypassMagPrefRules), // Don't bypass magpref rules
+                soci::use(bumpEventVersion), 
+                soci::use(commit); //  Commit happens later
+    
+    std::string setPrefMagOfEventQuery{
+R"''''(
+SELECT magpref.setPrefMagOfEvent(:evid, :commit)
+)''''"
+    };
+    *session << setPrefMagOfEventQuery,
+                soci::use(eventIdentifier),
+                soci::use(commit); 
+
+    std::string creditQuery{
+R"'''(
+INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
+)'''"
+    };
+    *session << creditQuery,
+                soci::use(magnitudeIdentifier),
+                soci::use(std::string  {"NETMAG"}),
+                soci::use(user);
+    tr.commit();
+    }
+}
+
+
+/// Magnitude already exists?
+std::optional<int64_t> AQMSPostgresClient::getMwCodaMagnitudeIdentifier(
+    const std::string &eventIdentifier) const
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    return getMwCodaMagnitudeIdentifier(identifier);
+}
+
+std::optional<int64_t> AQMSPostgresClient::getMwCodaMagnitudeIdentifier(
+    const int64_t eventIdentifier) const
+{
+    if (!mwCodaMagnitudeExists(eventIdentifier))
+    {
+        return std::nullopt;
+    }
+    // Query is cumbersome but ensures we always operate on prefor for event
+    int64_t magnitudeIdentifier{-1};
+    std::string query{
+R"'''(
+SELECT netmag.magid FROM event
+  INNER JOIN origin ON event.prefor = origin.orid
+   INNER JOIN netmag ON netmag.orid = origin.orid
+WHERE event.evid = :eventIdentifier AND netmag.magtype = :magtype AND netmag.magalgo = :magalgo LIMIT 1;
+)'''"
+    };  
+    auto session
+         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    try
+    {
+        *session << query,
+                    soci::use(eventIdentifier),
+                    soci::use(std::string {MAGNITUDE_TYPE}),
+                    soci::use(std::string {MAGNITUDE_ALGORITHM}),
+                    soci::into(magnitudeIdentifier);
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::error("Mw,Coda magnitude identifier query failed with "
+                    + std::string {e.what()});
+        return false;
+    }
+    return (magnitudeIdentifier >= 0) ? 
+           std::optional<int64_t> (magnitudeIdentifier) : std::nullopt;
+}
+
+bool AQMSPostgresClient::mwCodaMagnitudeExists(
+    const std::string &eventIdentifier) const
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    return mwCodaMagnitudeExists(identifier);
+}
+
+bool AQMSPostgresClient::mwCodaMagnitudeExists(
+    const int64_t eventIdentifier) const
+{
+    if (pImpl->mConnection == nullptr)
+    {   
+        throw std::runtime_error("Connection is NULL");
+    }   
+    if (!pImpl->mConnection->isConnected())
+    {   
+        spdlog::warn("Reconnecting to AQMS postgres");
+        pImpl->mConnection->connect();
+    }   
+    if (!pImpl->mConnection->isConnected())
+    {   
+         spdlog::critical("AQMS postgres connection broken");
+         throw std::runtime_error("AQMS database connection broken");
+    }
+    // Query is cumbersome but ensures we operate on prefor for event
+    std::string query{
+R"'''(
+SELECT COUNT(*) FROM event
+  INNER JOIN origin ON event.prefor = origin.orid
+   INNER JOIN netmag ON netmag.orid = origin.orid
+WHERE event.evid = :eventIdentifier AND netmag.magtype = :magtype AND netmag.magalgo = :magalgo;
+)'''"
+    };
+    int count{0};
+    auto session
+         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    try
+    {
+        *session << query,
+                    soci::use(eventIdentifier),
+                    soci::use(std::string {MAGNITUDE_TYPE}),
+                    soci::use(std::string {MAGNITUDE_ALGORITHM}),
+                    soci::into(count);
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::error("Mw,Coda magnitude existence query failed with " 
+                    + std::string {e.what()});
+        return false;
+    }
+    return (count >= 1) ? true : false;
+}
+
+/// Get prefor 
+int64_t AQMSPostgresClient::getPreferredOriginIdentifier(
+    const std::string &eventIdentifier) const
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    return getPreferredOriginIdentifier(identifier);
+  
+}
+
+int64_t AQMSPostgresClient::getPreferredOriginIdentifier(
+    const int64_t eventIdentifier) const
+{
+    if (pImpl->mConnection == nullptr)
+    {
+        throw std::runtime_error("Connection is NULL");
+    }
+    if (!pImpl->mConnection->isConnected())
+    {
+        spdlog::warn("Reconnecting to AQMS postgres");
+        pImpl->mConnection->connect();
+    }
+    if (!pImpl->mConnection->isConnected())
+    {
+         spdlog::critical("AQMS postgres connection broken");
+         throw std::runtime_error("AQMS database connection broken");
+    }
+
+    int64_t originIdentifier{-1};
+    std::string query{
+R"'''(
+SELECT prefor FROM event WHERE evid=:identifier LIMIT 1;
+)'''"
+    };
+    auto session
+         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    try
+    {
+        *session << query,
+                    soci::use(eventIdentifier),
+                    soci::into(originIdentifier);
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::error("Preferred origin query failed with "
+                    + std::string {e.what()});
+    }
+    if (originIdentifier ==-1)
+    {
+        throw std::runtime_error("Failed to get preferred origin identifier");
+    }
+    return originIdentifier;
+}
+
+/// Destructor
+AQMSPostgresClient::~AQMSPostgresClient() = default;

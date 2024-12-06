@@ -10,7 +10,7 @@ namespace CCTService
 {
 class IAuthenticator;
 class CCTPostgresService;
-class AQMSPostgres;
+class AQMSPostgresClient;
 class Events;
 }
 namespace CCTService
@@ -24,11 +24,15 @@ namespace CCTService
 class Callback
 {
 public:
+    Callback() = delete;
     /// @brief Constructor.
     /// @param[in] cctService      The CCT database service.
     /// @param[in] authenticator   The authenticator.
     Callback(std::shared_ptr<CCTPostgresService> &cctService,
-             std::shared_ptr<CCTService::IAuthenticator> authenticator);
+             std::shared_ptr<
+                std::map<std::string, std::unique_ptr<CCTService::AQMSPostgresClient>>
+             > &client,
+             std::shared_ptr<CCTService::IAuthenticator> &authenticator);
     /// @brief Destructor.
     ~Callback();
     /// @brief Processes an HTTP GET/POST/PUT request, e.g., 

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <set>
+#include <map>
 #include <cstdint>
 #include <spdlog/spdlog.h>
 #include <boost/asio.hpp>
@@ -10,6 +11,7 @@
 #include "listener.hpp"
 #include "ldap.hpp"
 #include "callback.hpp"
+#include "aqmsPostgresClient.hpp"
 #include "cctPostgresService.hpp"
 #include "postgresql.hpp"
 
@@ -111,6 +113,45 @@ std::shared_ptr<CCTService::CCTPostgresService> createCCTPostgresService(
     return service;
 }
 
+
+std::unique_ptr<CCTService::AQMSPostgresClient> createAQMSPostgresClient(
+    const std::string &schema)
+{
+    // Create pg connection
+    auto connection = std::make_unique<CCTService::PostgreSQL> (); 
+    if (schema == "production")
+    {
+        connection->setUser(std::getenv("CCT_PRODUCTION_AQMS_READ_WRITE_USER"));
+        connection->setPassword(std::getenv("CCT_PRODUCTION_AQMS_READ_WRITE_PASSWORD"));
+        connection->setDatabaseName(std::getenv("CCT_PRODUCTION_AQMS_DATABASE_NAME"));
+        connection->setAddress(std::getenv("CCT_PRODUCTION_AQMS_DATABASE_ADDRESS"));
+        connection->setPort(std::stoi(std::getenv("CCT_PRODUCTION_AQMS_DATABASE_PORT")));
+    }
+    else if (schema == "test")
+    {
+        connection->setUser(std::getenv("CCT_TEST_AQMS_READ_WRITE_USER"));
+        connection->setPassword(std::getenv("CCT_TEST_AQMS_READ_WRITE_PASSWORD"));
+        connection->setDatabaseName(std::getenv("CCT_TEST_AQMS_DATABASE_NAME"));
+        connection->setAddress(std::getenv("CCT_TEST_AQMS_DATABASE_ADDRESS"));
+        connection->setPort(std::stoi(std::getenv("CCT_TEST_AQMS_DATABASE_PORT")));
+    }
+    else
+    {
+        throw std::invalid_argument("Unhandled schema");
+    }
+    connection->connect();
+    if (!connection->isConnected())
+    {   
+        throw std::runtime_error("Could not create CCT connection");
+    }   
+    // Create the service
+    auto client
+        = std::make_unique<CCTService::AQMSPostgresClient>
+          (std::move(connection));
+    return client;
+}
+
+
 /*
 std::shared_ptr<CCTService::AQMSPostgresService> createAQMSPostgresService()
 {
@@ -135,20 +176,31 @@ int main(int argc, char* argv[])
 
     const std::set<std::string> schemas{"production", "test"};
 
-    std::string ldapServerAddress{std::getenv("LDAP_HOST")};
-    int ldapPort{std::stoi(std::getenv("LDAP_PORT"))};
-    std::string ldapOrganizationUnit{std::getenv("LDAP_ORGANIZATION_UNIT")};
-    std::string ldapDomainComponent{std::getenv("LDAP_DOMAIN_COMPONENT")};
-    auto ldapAuthenticator
-        = std::make_shared<CCTService::LDAP> 
-            (ldapServerAddress,
-             ldapPort,
-             ldapOrganizationUnit,
-             ldapDomainComponent,
-             CCTService::LDAP::Version::Three,
-             CCTService::LDAP::TLSVerifyClient::Allow);
-    //ldapAuthenticator->authenticate("user", "password");
-    //return 0;
+    spdlog::info("Creating CCT LDAP authenticator...");
+    std::shared_ptr<CCTService::IAuthenticator> ldapAuthenticator;
+    try
+    {
+        std::string ldapServerAddress{std::getenv("LDAP_HOST")};
+        int ldapPort{std::stoi(std::getenv("LDAP_PORT"))};
+        std::string ldapOrganizationUnit{std::getenv("LDAP_ORGANIZATION_UNIT")};
+        std::string ldapDomainComponent{std::getenv("LDAP_DOMAIN_COMPONENT")};
+        ldapAuthenticator
+            = std::make_shared<CCTService::LDAP> 
+                (ldapServerAddress,
+                 ldapPort,
+                 ldapOrganizationUnit,
+                 ldapDomainComponent,
+                 CCTService::LDAP::Version::Three,
+                 CCTService::LDAP::TLSVerifyClient::Allow);
+        //ldapAuthenticator->authenticate("user", "password");
+        //return 0;
+    }
+    catch (const std::exception &e)
+    {
+        spdlog::critical(e.what());
+        return EXIT_FAILURE;
+    }
+
     spdlog::info("Creating CCT database poller and service...");
     std::shared_ptr<CCTService::CCTPostgresService> cctPostgresService{nullptr};
     try
@@ -161,7 +213,30 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    const auto documentRoot = std::make_shared<std::string> (programOptions.documentRoot);
+    spdlog::info("Creating AQMS database clients...");
+    auto aqmsClients 
+        = std::make_shared<
+             std::map<std::string, std::unique_ptr<CCTService::AQMSPostgresClient>>
+          > ();
+    for (const auto &schema : schemas)
+    {
+        try
+        {
+            auto client = ::createAQMSPostgresClient(schema);
+            aqmsClients->insert(std::move( std::pair{schema, std::move(client)}));
+        }
+        catch (const std::exception &e)
+        {
+            spdlog::critical("Failed to create AQMS postgres client for schema "
+                           + schema + ".  Failed with "
+                           + std::string {e.what()});
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Start making the Beast webserver
+    const auto documentRoot
+        = std::make_shared<std::string> (programOptions.documentRoot);
 
     // The IO context is required for all I/O
     boost::asio::io_context ioContext{programOptions.nThreads};
@@ -169,7 +244,9 @@ int main(int argc, char* argv[])
     boost::asio::ssl::context context{boost::asio::ssl::context::tlsv12};
 
 
-    CCTService::Callback callback{cctPostgresService, ldapAuthenticator};
+    CCTService::Callback callback{cctPostgresService,
+                                  aqmsClients,
+                                  ldapAuthenticator};
 
     // The io_context is required for all I/O
     //boost::asio::io_context ioContext{threads};
