@@ -77,6 +77,100 @@ int64_t convertEventIdentifier(const std::string &eventIdentifier)
     return identifier;
 }
 
+std::pair<int, soci::indicator>
+    getNumberOfStations(const NetMag &networkMagnitude)
+{
+    int nStationsInsert{-1};
+    auto nStations = networkMagnitude.getNumberOfStations();
+    soci::indicator nStationsIndicator{soci::i_null};
+    if (nStations)
+    {
+        nStationsInsert = *nStations;
+        nStationsIndicator = soci::indicator::i_ok;
+    }
+    return std::pair {nStationsInsert, nStationsIndicator};
+}
+
+std::pair<int, soci::indicator>
+    getNumberOfObservations(const NetMag &networkMagnitude)
+{
+    int nObservationsInsert{-1};
+    auto nObservations = networkMagnitude.getNumberOfObservations();
+    soci::indicator nObservationsIndicator{soci::i_null};
+    if (nObservations)
+    {
+        nObservationsInsert = *nObservations;
+        nObservationsIndicator = soci::indicator::i_ok;
+    }
+    return std::pair {nObservationsInsert, nObservationsIndicator};
+}
+
+std::pair<double, soci::indicator> getGap(const NetMag &networkMagnitude)
+{
+    double gapInsert{-1};
+    auto gap = networkMagnitude.getGap();
+    soci::indicator gapIndicator{soci::i_null};
+    if (gap)
+    {   
+        gapInsert = *gap;
+        gapIndicator = soci::indicator::i_ok;
+    }   
+    return std::pair {gapInsert, gapIndicator};
+}
+
+std::pair<double, soci::indicator>
+    getDistance(const NetMag &networkMagnitude)
+{
+    double distanceInsert{-1};
+    auto distance = networkMagnitude.getDistance();
+    soci::indicator distanceIndicator{soci::i_null};
+    if (distance)
+    {
+        distanceInsert = *distance;
+        distanceIndicator = soci::indicator::i_ok;
+    }
+    return std::pair {distanceInsert, distanceIndicator};
+}
+
+std::pair<std::string, soci::indicator>
+    getMagnitudeAlgorithm(const NetMag &networkMagnitude)
+{
+    std::string magAlgo;
+    auto magnitudeAlgorithm = networkMagnitude.getMagnitudeAlgorithm();
+    soci::indicator magnitudeAlgorithmIndicator{soci::i_null};
+    if (magnitudeAlgorithm)
+    {
+        magAlgo = *magnitudeAlgorithm;
+        magnitudeAlgorithmIndicator = soci::i_ok;
+    }
+    return std::pair {magAlgo, magnitudeAlgorithmIndicator};
+}
+                
+std::pair<std::string, soci::indicator>
+    getReviewFlag(const NetMag &networkMagnitude)
+{
+    auto reviewFlag = networkMagnitude.getReviewFlag();
+    std::string stringReviewFlag;
+    soci::indicator reviewFlagIndicator{soci::i_null};
+    if (reviewFlag)
+    {
+        if (*reviewFlag == NetMag::ReviewFlag::Human)
+        {       
+            stringReviewFlag = "H";
+        }
+        else if (*reviewFlag == NetMag::ReviewFlag::Automatic)
+        {
+            stringReviewFlag = "A";
+        }
+        else
+        {
+            spdlog::warn("Unhandled review flag");
+        }
+    }
+    if (!stringReviewFlag.empty()){reviewFlagIndicator = soci::i_ok;}
+    return std::pair {stringReviewFlag, reviewFlagIndicator};
+}
+
 }
 
 class AQMSPostgresClient::AQMSPostgresClientImpl
@@ -124,7 +218,7 @@ void AQMSPostgresClient::insertNetworkMagnitude(
     // Make sure I have a magnitude identifier and a few other
     // things I can figure out on the fly
     auto session
-         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+        = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
     auto networkMagnitude = networkMagnitudeIn;
     /*
     if (!networkMagnitude.haveIdentifier())
@@ -157,6 +251,18 @@ void AQMSPostgresClient::insertNetworkMagnitude(
     }
 
     // Get values for insertNetMag function
+    auto [nStationsInsert, nStationsIndicator]
+        = ::getNumberOfStations(networkMagnitude);
+    auto [nObservationsInsert, nObservationsIndicator]
+        = ::getNumberOfObservations(networkMagnitude);
+    auto [gapInsert, gapIndicator] = ::getGap(networkMagnitude);
+    auto [distanceInsert, distanceIndicator] = ::getDistance(networkMagnitude);
+    auto [magAlgo, magnitudeAlgorithmIndicator]
+        = ::getReviewFlag(networkMagnitude);
+    auto [stringReviewFlag, reviewFlagIndicator]
+        = ::getReviewFlag(networkMagnitude);
+
+    /*
     int nStationsInsert{-1};
     auto nStations = networkMagnitude.getNumberOfStations();
     soci::indicator nStationsIndicator{soci::i_null};
@@ -221,6 +327,7 @@ void AQMSPostgresClient::insertNetworkMagnitude(
         }
     }
     if (!stringReviewFlag.empty()){reviewFlagIndicator = soci::i_ok;}
+    */
      
     // Let the commit fun begin
     {
@@ -252,6 +359,7 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
                 soci::use(commit),
                 soci::into(magnitudeIdentifier);
 
+    // TODO I think this is called by prefMagOfEvent function
     std::string setPrefMagTypeQuery{
 R"'''(
 SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
@@ -288,6 +396,176 @@ INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
     }
 }
 
+/// Update
+void AQMSPostgresClient::updateNetworkMagnitude(
+    const std::string &user,
+    const std::string &eventIdentifier,
+    const NetMag &networkMagnitude)
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    updateNetworkMagnitude(user, identifier, networkMagnitude);
+}
+ 
+
+void AQMSPostgresClient::updateNetworkMagnitude(
+    const std::string &user,
+    const int64_t eventIdentifier,
+    const NetMag &networkMagnitudeIn)
+{
+    auto networkMagnitude = networkMagnitudeIn;
+    if (!mwCodaMagnitudeExists(eventIdentifier))
+    {   
+        throw std::invalid_argument("Mw,Coda netmag already exists for "
+                                  + std::to_string (eventIdentifier));
+    }
+
+    auto magnitudeIdentifier = networkMagnitude.getIdentifier();
+    if (!networkMagnitude.haveMagnitudeType())
+    {
+        networkMagnitude.setMagnitudeType(MAGNITUDE_TYPE);
+    }
+    if (!networkMagnitude.haveSubSource())
+    {
+        networkMagnitude.setSubSource(MAGNITUDE_SUBSOURCE);
+    }
+    if (!networkMagnitude.haveMagnitude())
+    {
+        throw std::invalid_argument("Magnitude not set");
+    }
+    if (!networkMagnitude.haveAuthority())
+    {
+        throw std::invalid_argument("Authority not set");
+    }
+
+    // Get values for update - just overwrite the entire row 
+    auto [nStationsInsert, nStationsIndicator]
+        = ::getNumberOfStations(networkMagnitude);
+    auto [nObservationsInsert, nObservationsIndicator]
+        = ::getNumberOfObservations(networkMagnitude);
+    auto [gapInsert, gapIndicator] = ::getGap(networkMagnitude);
+    auto [distanceInsert, distanceIndicator] = ::getDistance(networkMagnitude);
+    auto [magAlgo, magnitudeAlgorithmIndicator]
+        = ::getReviewFlag(networkMagnitude);
+    auto [stringReviewFlag, reviewFlagIndicator]
+        = ::getReviewFlag(networkMagnitude);
+
+    // Begin the transaction
+    constexpr int commit{0};
+    auto session
+        = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    {   
+    soci::transaction tr(*session);
+
+    std::string updateNetMagQuery{
+R"'''(
+UPDATE NetMag SET (magnitude, magtype, auth, subsource, magalgo, nsta, nobs, gap, distance, rflag, lddate) = (:magnitude, :magtype, :auth, :subsource, :magalgo, :nsta, :nobs, :gap, :distance, :rflag, NOW()) WHERE magid = :magid;
+)'''"
+    };
+    *session << updateNetMagQuery,
+                //soci::use(networkMagnitude.getOriginIdentifier()),
+                soci::use(networkMagnitude.getMagnitude()),
+                soci::use(networkMagnitude.getMagnitudeType()),
+                soci::use(networkMagnitude.getAuthority()),
+                soci::use(networkMagnitude.getSubSource()),
+                soci::use(magAlgo, magnitudeAlgorithmIndicator),
+                soci::use(nStationsInsert, nStationsIndicator),
+                soci::use(nObservationsInsert, nObservationsIndicator),
+                //soci::use(uncertainty, nullIndicator),
+                soci::use(gapInsert, gapIndicator),
+                soci::use(distanceInsert, distanceIndicator),
+                //soci::use(quality, nullIndicator),
+                soci::use(stringReviewFlag, reviewFlagIndicator),
+                soci::use(magnitudeIdentifier);
+
+    // Update the preferred magnitude 
+    // TODO I think this is called by prefMagOfEvent function
+    std::string setPrefMagTypeQuery{
+R"'''(
+SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
+)'''"
+    };
+    const int bypassMagPrefRules{0}; // Don't bypass magpref rules
+    const int bumpEventVersion{0}; // Don't bump event version
+    *session << setPrefMagTypeQuery,
+                soci::use(eventIdentifier),
+                soci::use(magnitudeIdentifier), //networkMagnitude.getIdentifier()),
+                soci::use(bypassMagPrefRules), // Don't bypass magpref rules
+                soci::use(bumpEventVersion),
+                soci::use(commit); //  Commit happens later
+
+    std::string setPrefMagOfEventQuery{
+R"''''(
+SELECT magpref.setPrefMagOfEvent(:evid, :commit)
+)''''"
+    };
+    *session << setPrefMagOfEventQuery,
+                soci::use(eventIdentifier),
+                soci::use(commit);
+
+    std::string creditQuery{
+R"'''(
+INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
+)'''"
+    };
+    *session << creditQuery,
+                soci::use(magnitudeIdentifier),
+                soci::use(std::string  {"NETMAG"}),
+                soci::use(user);
+
+    tr.commit();
+    }
+
+}
+
+/// Delete operation
+void AQMSPostgresClient::deleteNetworkMagnitude(
+    const std::string &user,
+    const std::string &eventIdentifier)
+{
+    auto identifier = ::convertEventIdentifier(eventIdentifier);
+    deleteNetworkMagnitude(user, identifier);
+}
+
+void AQMSPostgresClient::deleteNetworkMagnitude(
+    const std::string &user,
+    const int64_t eventIdentifier)
+{
+    auto magnitudeIdentifier = getMwCodaMagnitudeIdentifier(eventIdentifier);
+    if (!magnitudeIdentifier)
+    {   
+        spdlog::warn("Network magnitude does not exist; skipping");
+        return;
+    }
+
+    // Begin the transaction
+    constexpr int commit{0};
+    auto session
+        = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    {
+    soci::transaction tr(*session);
+
+    // Delete the magnitude
+    std::string deleteNetMagQuery{
+R"'''(
+DELETE FROM NetMag WHERE magid = :magid
+)'''"
+    };
+    *session << deleteNetMagQuery,
+                soci::use(*magnitudeIdentifier);
+
+    // Try to update the preferred magnitude
+    std::string magPrefQuery{
+R"'''(
+SELECT magpref.setPrefMagOfEventByPrefor(:evid)
+)'''"
+    };
+    *session << magPrefQuery,
+                soci::use(eventIdentifier);
+
+    tr.commit();
+    }
+
+}
 
 /// Magnitude already exists?
 std::optional<int64_t> AQMSPostgresClient::getMwCodaMagnitudeIdentifier(

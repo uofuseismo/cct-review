@@ -24,8 +24,16 @@ public:
     explicit AQMSPostgresClient(std::unique_ptr<PostgreSQL> &&connection);
     /// @}
 
+    /// @brief Insert a network magnitude - this is an accept action.
     void insertNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude);
     void insertNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude);
+    /// @brief Updates a network magnitude - not sure how this happens
+    ///        but it could.
+    void updateNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude);
+    void updateNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude);
+    /// @brief Delete a network magnitude.  This is for a cancel action.
+    void deleteNetworkMagnitude(const std::string &user, const std::string &eventIdentifier);
+    void deleteNetworkMagnitude(const std::string &user, int64_t eventIdentifier);
     [[nodiscard]] std::optional<int64_t> getMwCodaMagnitudeIdentifier(const std::string &eventIdentifier) const;
     [[nodiscard]] std::optional<int64_t> getMwCodaMagnitudeIdentifier(int64_t eventIdentifier) const;
     [[nodiscard]] bool mwCodaMagnitudeExists(const std::string &eventIdentifier) const;
@@ -38,6 +46,11 @@ public:
     /// @brief Destructor.
     ~AQMSPostgresClient();
     /// @}
+
+    AQMSPostgresClient(const AQMSPostgresClient &) = delete;
+    AQMSPostgresClient(AQMSPostgresClient &&) noexcept = delete;
+    AQMSPostgresClient& operator=(const AQMSPostgresClient &) = delete;
+    AQMSPostgresClient& operator=(AQMSPostgresClient &&) noexcept = delete;
 private:
     class AQMSPostgresClientImpl;
     std::unique_ptr<AQMSPostgresClientImpl> pImpl;

@@ -688,23 +688,25 @@ if (schema == "test")
                 // Update or insert?
                 auto existingMagnitudeIdentifier
                     = pImpl->mAQMSClients->at(schema)
-                                         ->getMwCodaMagnitudeIdentifier(eventIdentifier);
+                           ->getMwCodaMagnitudeIdentifier(eventIdentifier);
                 if (existingMagnitudeIdentifier)
                 {
                     spdlog::info("Will attempt to update Mw,coda magnitude for "
                                + eventIdentifier + " for user " + credentials.user);
                     networkMagnitude.setIdentifier(*existingMagnitudeIdentifier);
+                    pImpl->mAQMSClients->at(schema)
+                         ->updateNetworkMagnitude(credentials.user,
+                                                  eventIdentifier,
+                                                  networkMagnitude);
                 }
                 else
                 {
                     spdlog::info("Will attempt to create Mw,coda magnitude for "
                                + eventIdentifier + " for user " + credentials.user);
-/*
                     pImpl->mAQMSClients->at(schema)
                          ->insertNetworkMagnitude(credentials.user,
                                                   eventIdentifier,
                                                   networkMagnitude);
-*/
                 }
 //spdlog::info(originIdentifier);
                 pImpl->mCCTPostgresService->acceptEvent(schema, eventIdentifier);
@@ -770,6 +772,18 @@ else
             {
 if (schema == "test")
 {
+                // Update or insert?
+                auto mwCodaMagnitudeExists
+                    = pImpl->mAQMSClients->at(schema)
+                           ->mwCodaMagnitudeExists(eventIdentifier);
+                if (mwCodaMagnitudeExists)
+                {
+                    spdlog::info("Will attempt to delete Mw,coda magnitude for "
+                               + eventIdentifier + " for user " + credentials.user);
+                    pImpl->mAQMSClients->at(schema)
+                         ->deleteNetworkMagnitude(credentials.user,
+                                                  eventIdentifier);
+                }
                 pImpl->mCCTPostgresService->rejectEvent(schema, eventIdentifier);
                 status = "success";
 }
