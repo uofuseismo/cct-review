@@ -208,7 +208,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
           document.body.appendChild(downloadAnchorNode); { /* Required for firefox */ }
           downloadAnchorNode.click(); 
           downloadAnchorNode.remove();
-          console.log("Download");
+          console.debug("Downloaded");
         }
         else {
           console.warn("No data to download");
@@ -229,16 +229,16 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
         if ( jsonData !== null ) {
           if (jsonData.status.toLowerCase() === 'success') {
             try {
-               onAcceptOrRejectEvent();
+              onAcceptOrRejectEvent();
             }
             catch (error) {
-               console.error(`Failed to update event data after accept; failed with ${error}`);
+              console.error(`Failed to update event data after accept; failed with ${error}`);
             }
-            alert('Successfully accepted magnitude');
+            alert('Successfully accepted magnitude in AQMS/CCT database and submitted to ComCat.');
             return;
           }
         }
-        alert('Failed to accept magnitude');
+        alert('Failed to accept magnitude!');
       })
       .catch(error => {
         setAcceptRequested(false);
@@ -255,16 +255,16 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
         if ( jsonData !== null ) { 
           if (jsonData.status.toLowerCase() === 'success') {
             try {
-               onAcceptOrRejectEvent();
+              onAcceptOrRejectEvent();
             }   
             catch (error) {
-               console.error(`Failed to update event data after accept; failed with ${error}`);
-            }   
-            alert('Successfully rejected magnitude');
+              console.error(`Failed to update event data after accept; failed with ${error}`);
+            }
+            alert('Successfully deleted magnitude from AQMS and CCT database.  However, you must manually resubmit all existing magnitudes to ComCat for this event.');
             return;
           }
         }
-        alert('Failed to reject magnitude');
+        alert('Failed to reject magnitude!');
       })
       .catch(error => {
         setAcceptRequested(false);
