@@ -247,7 +247,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
     }
   }
 
-  const rejectMagnitude = () => {
+  const rejectMagnitude = (isAccepted) => {
     if ( {eventIdentifier} ) { 
       setRejectRequested(true);
       rejectFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
@@ -260,7 +260,12 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
             catch (error) {
               console.error(`Failed to update event data after accept; failed with ${error}`);
             }
-            alert('Successfully deleted magnitude from AQMS and CCT database.  Verify the magnitudes are correct at the USGS.');
+            if (isAccepted) {
+              alert('Successfully deleted magnitude from AQMS and CCT database.  Verify the magnitudes are correct at the USGS.');
+            }
+            else {
+              alert('Successfully rjeected magnitude in CCT database');
+            }
             return;
           }
         }
@@ -271,6 +276,17 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
         console.error(`Failed to reject magnitude; failed with ${error}`);
       });
     }
+  }
+
+  var acceptToolTip = 'Add the Mw,Coda magnitude to the local database and submit to ComCat';
+  if (isAccepted) {
+    acceptToolTip = '';
+  }
+  var rejectToolTip = isAccepted ?
+                      'Reject the Mw,Coda magnitude from the local database and, if necessary, ComCat' :
+                      'Reject the Mw,Coda magnitude from the local database';
+  if (isRejected) {
+    rejectToolTip = '';
   }
 
   return (
@@ -308,7 +324,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
              </Tbody> 
           </Table> 
         </TableContainer>
-        <Tooltip label='Add the Mw,Coda magnitude to the local database and submit to ComCat'>
+        <Tooltip label={acceptToolTip}>
           <Button
            aria-label='Accept Mw,Coda magnitude'
            width='90%'
@@ -323,7 +339,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
            Accept
           </Button>
         </Tooltip>
-        <Tooltip label='Delete the Mw,Coda magnitude from the local database and ComCat'>
+        <Tooltip label={rejectToolTip}>
           <Button
            aria-label='Reject magnitude'
            width='90%'
@@ -332,7 +348,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
            isDisabled={!canSubmit || isRejected}
            isLoading={rejectRequested}
            onClick={ () => {
-             rejectMagnitude();
+             rejectMagnitude(isAccepted);
            } }
           >
            Reject 
