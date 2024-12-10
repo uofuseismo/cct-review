@@ -772,7 +772,7 @@ else
             {
 if (schema == "test")
 {
-                // Update or insert?
+                // Delete
                 auto mwCodaMagnitudeExists
                     = pImpl->mAQMSClients->at(schema)
                            ->mwCodaMagnitudeExists(eventIdentifier);

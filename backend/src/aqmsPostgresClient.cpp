@@ -258,7 +258,7 @@ void AQMSPostgresClient::insertNetworkMagnitude(
     auto [gapInsert, gapIndicator] = ::getGap(networkMagnitude);
     auto [distanceInsert, distanceIndicator] = ::getDistance(networkMagnitude);
     auto [magAlgo, magnitudeAlgorithmIndicator]
-        = ::getReviewFlag(networkMagnitude);
+        = ::getMagnitudeAlgorithm(networkMagnitude);
     auto [stringReviewFlag, reviewFlagIndicator]
         = ::getReviewFlag(networkMagnitude);
 
@@ -342,9 +342,11 @@ R"'''(
 SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta, :nobs, :uncertainty, :gap, :dist, :quality, :rflag, :commit)
 )'''"
     };
+    double roundedMagnitude
+         = std::round(networkMagnitude.getMagnitude()*100)/100.0;
     *session << insertNetMagQuery,
                 soci::use(networkMagnitude.getOriginIdentifier()),
-                soci::use(networkMagnitude.getMagnitude()),
+                soci::use(roundedMagnitude), //networkMagnitude.getMagnitude()),
                 soci::use(networkMagnitude.getMagnitudeType()),
                 soci::use(networkMagnitude.getAuthority()),
                 soci::use(networkMagnitude.getSubSource()),
@@ -445,7 +447,7 @@ void AQMSPostgresClient::updateNetworkMagnitude(
     auto [gapInsert, gapIndicator] = ::getGap(networkMagnitude);
     auto [distanceInsert, distanceIndicator] = ::getDistance(networkMagnitude);
     auto [magAlgo, magnitudeAlgorithmIndicator]
-        = ::getReviewFlag(networkMagnitude);
+        = ::getMagnitudeAlgorithm(networkMagnitude);
     auto [stringReviewFlag, reviewFlagIndicator]
         = ::getReviewFlag(networkMagnitude);
 
@@ -461,9 +463,11 @@ R"'''(
 UPDATE NetMag SET (magnitude, magtype, auth, subsource, magalgo, nsta, nobs, gap, distance, rflag, lddate) = (:magnitude, :magtype, :auth, :subsource, :magalgo, :nsta, :nobs, :gap, :distance, :rflag, NOW()) WHERE magid = :magid;
 )'''"
     };
+    double roundedMagnitude
+         = std::round(networkMagnitude.getMagnitude()*100)/100.0;
     *session << updateNetMagQuery,
                 //soci::use(networkMagnitude.getOriginIdentifier()),
-                soci::use(networkMagnitude.getMagnitude()),
+                soci::use(roundedMagnitude), //networkMagnitude.getMagnitude()),
                 soci::use(networkMagnitude.getMagnitudeType()),
                 soci::use(networkMagnitude.getAuthority()),
                 soci::use(networkMagnitude.getSubSource()),
@@ -538,6 +542,8 @@ void AQMSPostgresClient::deleteNetworkMagnitude(
     }
 
     // Begin the transaction
+    spdlog::info("Attempting to delete magnitude "
+               + std::to_string (*magnitudeIdentifier) + " from NetMag");
     constexpr int commit{0};
     auto session
         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());

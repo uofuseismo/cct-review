@@ -234,7 +234,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
             catch (error) {
               console.error(`Failed to update event data after accept; failed with ${error}`);
             }
-            alert('Successfully accepted magnitude in AQMS/CCT database and submitted to ComCat.');
+            alert('Successfully accepted magnitude in AQMS/CCT database and submitted to ComCat.  Verify the magnitudes are correct at the USGS.');
             return;
           }
         }
@@ -260,7 +260,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
             catch (error) {
               console.error(`Failed to update event data after accept; failed with ${error}`);
             }
-            alert('Successfully deleted magnitude from AQMS and CCT database.  However, you must manually resubmit all existing magnitudes to ComCat for this event.');
+            alert('Successfully deleted magnitude from AQMS and CCT database.  Verify the magnitudes are correct at the USGS.');
             return;
           }
         }
@@ -323,7 +323,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
            Accept
           </Button>
         </Tooltip>
-        <Tooltip label='Delete the Mw,Coda magnitude from the local database; manual removal from ComCat is still required'>
+        <Tooltip label='Delete the Mw,Coda magnitude from the local database and ComCat'>
           <Button
            aria-label='Reject magnitude'
            width='90%'
