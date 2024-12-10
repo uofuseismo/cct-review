@@ -7,6 +7,9 @@ import Header from '/src/components/Header';
 import Footer from '/src/components/Footer';
 import getLightWeightEventDataFromAPI from '/src/utilities/getLightWeightDataFromAPI';
 
+/// Don't need a ton of refreshes - every minute is fine
+const catalogRefreshRate = 60;
+
 function CCTReview( { userCredentials, onLogout } ) {
   console.debug('Rendering CCTReview...');
   const jsonWebToken = userCredentials.jsonWebToken;
@@ -101,9 +104,18 @@ function CCTReview( { userCredentials, onLogout } ) {
     }
   };
 
+  // Run once on start up
   React.useEffect(() => {
     handleGetEvents();
   }, []);
+
+  // Now poll the API
+  React.useEffect( () => {
+    console.debug('Refresh from poller');
+    const timer = setInterval(handleGetEvents, catalogRefreshRate*1000);
+    return () => clearInterval(timer);
+  }, [events, eventIdentifier, graphData, settings]);
+
 
   return (
     <React.Fragment>

@@ -308,45 +308,51 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
              </Tbody> 
           </Table> 
         </TableContainer>
-        <Button
-         aria-label='Accept magnitude'
-         width='90%'
-         colorScheme='green'
-         rightIcon={<CheckIcon />}
-         isDisabled={!canSubmit || isAccepted}
-         isLoading={acceptRequested}
-         onClick={ () => {
-           acceptMagnitude()
-         } }
-        >
-         Accept
-        </Button>
-        <Button
-         aria-label='Reject magnitude'
-         width='90%'
-         colorScheme='red'
-         rightIcon={<DeleteIcon />} 
-         isDisabled={!canSubmit || isRejected}
-         isLoading={rejectRequested}
-         onClick={ () => {
-           rejectMagnitude();
-         } }
-        >
-         Reject 
-        </Button>
-        <Button
-         aria-label='Download the detailed CCT data for this event'
-         width='90%'
-         colorScheme='purple'
-         variant='outline'
-         rightIcon={<DownloadIcon />}
-         isLoading={dataIsRequested}
-         onClick={ () => {
-           downloadJSON()
-         } }
-        >
-         Download
-        </Button>
+        <Tooltip label='Add the Mw,Coda magnitude to the local database and submit to ComCat'>
+          <Button
+           aria-label='Accept Mw,Coda magnitude'
+           width='90%'
+           colorScheme='green'
+           rightIcon={<CheckIcon />}
+           isDisabled={!canSubmit || isAccepted}
+           isLoading={acceptRequested}
+           onClick={ () => {
+             acceptMagnitude()
+           } }
+          >
+           Accept
+          </Button>
+        </Tooltip>
+        <Tooltip label='Delete the Mw,Coda magnitude from the local database; manual removal from ComCat is still required'>
+          <Button
+           aria-label='Reject magnitude'
+           width='90%'
+           colorScheme='red'
+           rightIcon={<DeleteIcon />} 
+           isDisabled={!canSubmit || isRejected}
+           isLoading={rejectRequested}
+           onClick={ () => {
+             rejectMagnitude();
+           } }
+          >
+           Reject 
+          </Button>
+        </Tooltip>
+        <Tooltip label='Download the detailed CCT data for this event'>
+          <Button
+           aria-label='Download the detailed CCT data for this event'
+           width='90%'
+           colorScheme='purple'
+           variant='outline'
+           rightIcon={<DownloadIcon />}
+           isLoading={dataIsRequested}
+           onClick={ () => {
+             downloadJSON()
+           } }
+          >
+           Download
+          </Button>
+        </Tooltip>
       </VStack>
     </React.Fragment>
   );
