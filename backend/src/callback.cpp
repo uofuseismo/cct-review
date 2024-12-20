@@ -630,8 +630,8 @@ std::string Callback::operator()(
                        + " on " + schema + " schema");
             try
             {
-if (schema == "test")
-{
+//if (schema == "test")
+//{
                 auto eventDetails
                     = pImpl->mCCTPostgresService->getEvent(schema,
                                                            eventIdentifier);
@@ -711,11 +711,11 @@ if (schema == "test")
 //spdlog::info(originIdentifier);
                 pImpl->mCCTPostgresService->acceptEvent(schema, eventIdentifier);
                 status = "success";
-}
-else
-{
- spdlog::critical("update for prod");
-}
+//}
+//else
+//{
+// spdlog::critical("update for prod");
+//}
                 status = "success"; 
             }
             catch (const std::exception &error)
@@ -770,8 +770,8 @@ else
                        + " in schema " + schema);
             try
             {
-if (schema == "test")
-{
+//if (schema == "test")
+//{
                 // Delete
                 auto mwCodaMagnitudeExists
                     = pImpl->mAQMSClients->at(schema)
@@ -786,12 +786,12 @@ if (schema == "test")
                 }
                 pImpl->mCCTPostgresService->rejectEvent(schema, eventIdentifier);
                 status = "success";
-}
-else
-{
- spdlog::critical("update reject for prod");
-status = "success";
-}
+//}
+//else
+//{
+// spdlog::critical("update reject for prod");
+//status = "success";
+//}
             }
             catch (const std::exception &error)
             {
