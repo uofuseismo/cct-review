@@ -21,7 +21,6 @@ function stationColorMap(stationMeasurements, colorMap) {
   }
   const nColors = colorMap.length;
   const interval = nColors/(nStations - 1);
-  console.info(nStations, interval);
   for (var i = 0; i < stationMeasurements.length; i++) {
     const idx = Math.max(0, Math.min(nColors - 1, Math.floor(interval*i)));
     stationMeasurements[i].color = rgbToHex(colorMap[idx]);
@@ -35,6 +34,8 @@ function SpectraFit( props ) {
   var lowerBound = null;
   var upperBound = null;
   var measurements = [];
+  var yMin = null;
+  var yMax = null;
   if ( props.data != null ) {
     const spectralFit = props.data.spectralFit;
     fitLine = [];
@@ -58,24 +59,40 @@ function SpectraFit( props ) {
       var points = [];
       for (var j = 0; j < stationMeasurements[i].measurements.length; j++) {
         const residual  = stationMeasurements[i].measurements[j].residual.toFixed(3);
+        const yValue = stationMeasurements[i].measurements[j].value;
         points.push({x: stationMeasurements[i].measurements[j].centerFrequency,
-                     y: stationMeasurements[i].measurements[j].value,
+                     y: yValue,
                      label: `${stationMeasurements[i].station}: ${residual}`,
                      color: stationMeasurements[i].color,
                      size: 3});
+        if (yMin == null) {
+          yMin = yValue;
+        }
+        if (yMax == null) {
+          yMax = yValue;
+        }
+        yMin = Math.min(yMin, yValue);
+        yMax = Math.max(yMax, yValue);
       }
       var measurement = {id: stationMeasurements[i].station,
                          points: points.slice()};
       measurements.push(measurement);
     }
-    
+    // Ticket 823 want's 2
+    if (yMin != null && yMax != null) {
+      yMin = yMin - 2;
+      yMax = yMax + 2;
+    }
   }
+  if (yMin == null){yMin = 0;}
+  if (yMax == null){yMax = 30;}
   return (
     <React.Fragment>
       <VictoryChart
        responsive={true}
        theme={VictoryTheme.grayscale}
        scale={{x: "log", y: "linear"}}
+       domain={{ y : [yMin, yMax] }}
        padding={25}
       >
         <VictoryAxis
