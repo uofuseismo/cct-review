@@ -54,6 +54,7 @@ public:
     [[nodiscard]] Event getEvent(const std::string &schema, const std::string &identifier) const;
     [[nodiscard]] std::string lightWeightDataToString(const std::string &schema, int indent =-1) const;
     [[nodiscard]] std::string heavyWeightDataToString(const std::string &schema, const std::string &identifier, int indent =-1) const;
+    [[nodiscard]] std::string envelopeDataToString(const std::string &schema, const std::string &identifier, int indent =-1) const;
     [[nodiscard]] size_t getCurrentHash(const std::string &schema) const;
     /// @name Destructors
     /// @{

@@ -6,6 +6,7 @@ import { Alert, AlertIcon } from '@chakra-ui/react';
 import acceptFromAPI from '/src/utilities/acceptFromAPI';
 import rejectFromAPI from '/src/utilities/rejectFromAPI';
 import getHeavyWeightDataFromAPI from '/src/utilities/getHeavyWeightDataFromAPI';
+import getEnvelopeDataFromAPI from '/src/utilities/getEnvelopeDataFromAPI';
 { /* import downloadJSONData from '/src/utilities/downloadJSONData'; */ }
 { /* import Button from '@mui/material/Button'; */ }
 { /* import ButtonGroup from '@mui/material/ButtonGroup'; */ }
@@ -112,11 +113,12 @@ function FitBadges( {likelyPoorlyConstrained,
 }
 
 function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcceptOrRejectEvent} ) {
-  var [ dataIsRequested,  setDataIsRequested  ] = React.useState( false ); 
-  var [ acceptRequested,  setAcceptRequested  ] = React.useState( false );
-  var [ rejectRequested,  setRejectRequested  ] = React.useState( false );
-  var [ showSuccessAlert, setShowSuccessAlert ] = React.useState( false );
-  var [ showFailureAlert, setShowFailureAlert ] = React.useState( false ); 
+  var [ dataIsRequested,         setDataIsRequested  ] = React.useState( false ); 
+  var [ envelopeDataIsRequested, setEnvelopeDataIsRequested ] = React.useState( false );
+  var [ acceptRequested,         setAcceptRequested  ] = React.useState( false );
+  var [ rejectRequested,         setRejectRequested  ] = React.useState( false );
+  var [ showSuccessAlert,        setShowSuccessAlert ] = React.useState( false );
+  var [ showFailureAlert,        setShowFailureAlert ] = React.useState( false ); 
   var eventIdentifier = null;
   var mwCodaMagnitude = null;
   var catalogMagnitude = null;
@@ -197,7 +199,7 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
         { /* File object */ }
         if ( jsonData !== null ) {
           console.debug("Creating download link...");
-          console.debug(jsonData);
+          //console.debug(jsonData);
           //const file = new Blob([{jsonData}], {type: 'data:text/json;charset=utf-8,'});
           const dataString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonData));
           { /* Anchor link */ }
@@ -220,6 +222,40 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
       });
     }
   }
+
+  { /* Download envelope data for event in a JSON file */ }
+  const downloadEnvelopeJSON = () => {
+    if ( {eventIdentifier} ) { 
+      setEnvelopeDataIsRequested(true);
+      getEnvelopeDataFromAPI( schema, jsonWebToken, eventIdentifier, onLogout ).then( (jsonData) => {
+        setEnvelopeDataIsRequested(false);
+        { /* File object */ }
+        if ( jsonData !== null ) { 
+          console.debug("Creating download link...");
+          //console.debug(jsonData);
+          //const file = new Blob([{jsonData}], {type: 'data:text/json;charset=utf-8,'});
+          const dataString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(jsonData));
+          { /* Anchor link */ }
+          let downloadAnchorNode = document.createElement("a");
+          downloadAnchorNode.setAttribute("href",      dataString);
+          downloadAnchorNode.setAttribute("download", `${eventIdentifier}-cct-envelope-data.json`);
+          { /* Simulate link click */ }
+          document.body.appendChild(downloadAnchorNode); { /* Required for firefox */ }
+          downloadAnchorNode.click(); 
+          downloadAnchorNode.remove();
+          console.debug("Downloaded");
+        }
+        else {
+          console.warn("No data to download");
+        }
+      })  
+      .catch(error => {
+        setEnvelopeDataIsRequested(false);
+        console.error(`Failed to get heavy weight data from API; failed with ${error}`);
+      }); 
+    }   
+  }
+
 
   const acceptMagnitude = () => {
     if ( {eventIdentifier} ) {
@@ -363,10 +399,25 @@ function TableFit( {jsonWebToken, schema, canSubmit, eventData, onLogout, onAcce
            rightIcon={<DownloadIcon />}
            isLoading={dataIsRequested}
            onClick={ () => {
-             downloadJSON()
+             downloadJSON();
            } }
           >
            Download
+          </Button>
+        </Tooltip>
+        <Tooltip label='Download envelope data for this event'>
+          <Button
+           aria-label='Download envelope data for this event'
+           width='90%'
+           colorScheme='orange'
+           variant='outline'
+           rightIcon={<DownloadIcon />}
+           isLoading={envelopeDataIsRequested}
+           onClick={ () => {
+             downloadEnvelopeJSON();
+           } }
+          >
+           Envelopes
           </Button>
         </Tooltip>
       </VStack>

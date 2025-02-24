@@ -256,6 +256,34 @@ public:
         std::scoped_lock lock(mMutex);
         return mEventsMap.at(schema).lightWeightDataToString(indent);
     }   
+    /// Query for envelope data
+    [[nodiscard]] std::string envelopeDataToString(const std::string &schema,
+                                                   const std::string &eventIdentifier,
+                                                   const int indent) const
+    {
+        std::string result;
+        auto session
+             = reinterpret_cast<soci::session *> (mConnection->getSession());
+        *session << "SELECT CAST(envelope_data AS TEXT) FROM "
+                  + schema + ".event "
+                  + " WHERE " + schema + ".event.identifier = " + eventIdentifier
+                  + " LIMIT 1;",
+                  soci::into(result);
+        if (!result.empty())
+        {
+            try
+            {
+                auto envelopeJsonData = nlohmann::json::parse(result);
+                result = envelopeJsonData.dump(indent); 
+            }
+            catch (const std::exception &e)
+            {
+                spdlog::warn("Failed to unpack data for " + eventIdentifier);
+                result.clear();
+            }
+        }
+        return result; 
+    }
     /// Heavyweight data to string
     [[nodiscard]] std::string heavyWeightDataToString(const std::string &schema,
                                                       const std::string &eventIdentifier,
@@ -442,6 +470,25 @@ std::string CCTPostgresService::heavyWeightDataToString(
 {
     return pImpl->heavyWeightDataToString(schema, identifier, indent);
 }
+
+/// Envelope data
+std::string CCTPostgresService::envelopeDataToString(
+    const std::string &schema,
+    const std::string &identifier,
+    const int indent) const
+{
+    if (!haveSchema(schema))
+    {
+        throw std::invalid_argument("Schema " + schema + " does not exist");
+    }
+    if (!haveEvent(schema, identifier))
+    {
+        throw std::invalid_argument("Event " + identifier
+                                  + " does not exist in schema " + schema);
+    }
+    return pImpl->envelopeDataToString(schema, identifier, indent);
+}
+
 
 /// Accept event
 void CCTPostgresService::acceptEvent(

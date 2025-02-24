@@ -593,6 +593,49 @@ std::string Callback::operator()(
         result["data"] = std::move(eventData);
         return result.dump();
     }
+    else if (requestType == "envelopeData")
+    {
+        if (!object.contains("schema"))
+        {
+            throw BadRequestException("schema not set in JSON request");
+        }
+        if (!object.contains("eventIdentifier"))
+        {
+            throw BadRequestException(
+                "eventIdentifier not set in JSON request");
+        }
+        spdlog::debug("Performing envelope data request for "
+                    + credentials.user);
+        auto eventIdentifier
+            = object["eventIdentifier"].template get<std::string> (); 
+        if (eventIdentifier.empty())
+        {
+            throw BadRequestException("Event identifier is empty");
+        }
+        auto schema = object["schema"].template get<std::string> (); 
+        if (!pImpl->mCCTPostgresService->haveSchema(schema))
+        {
+            throw BadRequestException("Invalid schema: " + schema);
+        }
+        nlohmann::json result;
+        std::string envelopeData;
+        try
+        {
+            envelopeData
+               = pImpl->mCCTPostgresService->envelopeDataToString(
+                     schema, eventIdentifier, -1);
+        }
+        catch (const std::exception &e)
+        {
+            throw BadRequestException("Invalid event identifier: "
+                                    + eventIdentifier);
+        }
+        result["status"] = "success";
+        result["request"] = requestType;
+        result["eventIdentifier"] = eventIdentifier;
+        result["data"] = std::move(envelopeData);
+        return result.dump();
+    }
     else if (requestType == "accept")
     {
         if (!object.contains("schema"))
