@@ -491,11 +491,11 @@ std::string Callback::operator()(
     {
         throw std::runtime_error("Could not parse JSON request");
     }
-    if (!object.contains("request_type"))
+    if (!object.contains("requestType"))
     {
-        throw BadRequestException("request_type not set in JSON request");
+        throw BadRequestException("requestType not set in JSON request");
     }
-    auto requestType = object["request_type"].template get<std::string> ();
+    auto requestType = object["requestType"].template get<std::string> ();
     spdlog::info("Received request type " + requestType
                + " from " + credentials.user);
     // Schema requests

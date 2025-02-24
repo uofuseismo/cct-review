@@ -24,7 +24,7 @@ function getLightWeightEventDataFromAPI( schema, jsonToken, handleLogout ) {
   };  
 
   const requestData = { 
-    request_type: 'cctData',
+    requestType: 'cctData',
     schema: schema
   }; 
 

@@ -22,7 +22,7 @@ function getHeavyWeightDataFromAPI( schema, jsonToken, eventIdentifier, handleLo
   };
  
   const requestData = { 
-    request_type: 'eventData',
+    requestType: 'eventData',
     schema: schema,
     eventIdentifier: eventIdentifier
   };  

@@ -22,7 +22,7 @@ function rejectFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   };
  
   const rejectRequest = { 
-    request_type: 'reject',
+    requestType: 'reject',
     schema: schema,
     eventIdentifier: eventIdentifier
   };  

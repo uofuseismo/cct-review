@@ -22,7 +22,7 @@ function getEnvelopeDataFromAPI( schema, jsonToken, eventIdentifier, handleLogou
   };
  
   const requestData = { 
-    request_type: 'envelopeData',
+    requestType: 'envelopeData',
     schema: schema,
     eventIdentifier: eventIdentifier
   };  

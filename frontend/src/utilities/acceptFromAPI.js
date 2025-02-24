@@ -22,7 +22,7 @@ function acceptFromAPI( schema, jsonToken, eventIdentifier, handleLogout ) {
   };
  
   const acceptRequest = { 
-    request_type: 'accept',
+    requestType: 'accept',
     schema: schema,
     eventIdentifier: eventIdentifier
   };  

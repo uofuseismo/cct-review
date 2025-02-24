@@ -10,7 +10,7 @@ export default function loginToAPI( user, password, onUpdateUserCredentials ) {
   console.debug(authorizationHeader);
 
   const requestData = { 
-    request_type: 'login',
+    requestType: 'login',
     schema: null
   };  
 
