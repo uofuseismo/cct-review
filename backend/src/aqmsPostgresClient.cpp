@@ -344,12 +344,16 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
     };
     double roundedMagnitude
          = std::round(networkMagnitude.getMagnitude()*100)/100.0;
+    auto originIdentifier = networkMagnitude.getOriginIdentifier();
+    auto magnitudeType = networkMagnitude.getMagnitudeType();
+    auto authority = networkMagnitude.getAuthority();
+    auto subSource = networkMagnitude.getSubSource();
     *session << insertNetMagQuery,
-                soci::use(networkMagnitude.getOriginIdentifier()),
+                soci::use(originIdentifier), //networkMagnitude.getOriginIdentifier()),
                 soci::use(roundedMagnitude), //networkMagnitude.getMagnitude()),
-                soci::use(networkMagnitude.getMagnitudeType()),
-                soci::use(networkMagnitude.getAuthority()),
-                soci::use(networkMagnitude.getSubSource()),
+                soci::use(magnitudeType), //networkMagnitude.getMagnitudeType()),
+                soci::use(authority), //networkMagnitude.getAuthority()),
+                soci::use(subSource), //networkMagnitude.getSubSource()),
                 soci::use(magAlgo, magnitudeAlgorithmIndicator),
                 soci::use(nStationsInsert, nStationsIndicator),
                 soci::use(nObservationsInsert, nObservationsIndicator),
@@ -390,9 +394,10 @@ R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
 )'''"
     };
+    std::string netmag{"NETMAG"};
     *session << creditQuery,
                 soci::use(magnitudeIdentifier),
-                soci::use(std::string  {"NETMAG"}),
+                soci::use(netmag), //std::string  {"NETMAG"}),
                 soci::use(user);
     tr.commit();
     }
@@ -465,12 +470,15 @@ UPDATE NetMag SET (magnitude, magtype, auth, subsource, magalgo, nsta, nobs, gap
     };
     double roundedMagnitude
          = std::round(networkMagnitude.getMagnitude()*100)/100.0;
+    auto magnitudeType = networkMagnitude.getMagnitudeType();
+    auto authority = networkMagnitude.getAuthority();
+    auto subSource = networkMagnitude.getSubSource();
     *session << updateNetMagQuery,
                 //soci::use(networkMagnitude.getOriginIdentifier()),
                 soci::use(roundedMagnitude), //networkMagnitude.getMagnitude()),
-                soci::use(networkMagnitude.getMagnitudeType()),
-                soci::use(networkMagnitude.getAuthority()),
-                soci::use(networkMagnitude.getSubSource()),
+                soci::use(magnitudeType), //networkMagnitude.getMagnitudeType()),
+                soci::use(authority), //networkMagnitude.getAuthority()),
+                soci::use(subSource), //networkMagnitude.getSubSource()),
                 soci::use(magAlgo, magnitudeAlgorithmIndicator),
                 soci::use(nStationsInsert, nStationsIndicator),
                 soci::use(nObservationsInsert, nObservationsIndicator),
@@ -511,9 +519,10 @@ R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
 )'''"
     };
+    std::string netmag{"NETMAG"};
     *session << creditQuery,
                 soci::use(magnitudeIdentifier),
-                soci::use(std::string  {"NETMAG"}),
+                soci::use(netmag), //std::string  {"NETMAG"}),
                 soci::use(user);
 
     tr.commit();
@@ -602,10 +611,12 @@ WHERE event.evid = :eventIdentifier AND netmag.magtype = :magtype AND netmag.mag
          = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
     try
     {
+        std::string magnitudeType{MAGNITUDE_TYPE};
+        std::string magnitudeAlgorithm{MAGNITUDE_ALGORITHM};
         *session << query,
                     soci::use(eventIdentifier),
-                    soci::use(std::string {MAGNITUDE_TYPE}),
-                    soci::use(std::string {MAGNITUDE_ALGORITHM}),
+                    soci::use(magnitudeType), //std::string {MAGNITUDE_TYPE}),
+                    soci::use(magnitudeAlgorithm), //std::string {MAGNITUDE_ALGORITHM}),
                     soci::into(magnitudeIdentifier);
     }
     catch (const std::exception &e)
@@ -656,10 +667,12 @@ WHERE event.evid = :eventIdentifier AND netmag.magtype = :magtype AND netmag.mag
          = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
     try
     {
+        std::string magnitudeType{MAGNITUDE_TYPE};
+        std::string magnitudeAlgorithm{MAGNITUDE_ALGORITHM};
         *session << query,
                     soci::use(eventIdentifier),
-                    soci::use(std::string {MAGNITUDE_TYPE}),
-                    soci::use(std::string {MAGNITUDE_ALGORITHM}),
+                    soci::use(magnitudeType), //std::string {MAGNITUDE_TYPE}),
+                    soci::use(magnitudeAlgorithm), //std::string {MAGNITUDE_ALGORITHM}),
                     soci::into(count);
     }
     catch (const std::exception &e)

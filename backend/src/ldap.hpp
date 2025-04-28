@@ -8,7 +8,7 @@ namespace CCTService
 /// @brief Defines a Lightweight Directory Access Protocol (LDAP)
 ///        authenticator for UUSS.
 /// @copyright Ben Baker (University of Utah) distributed under the MIT license.
-class LDAP : public IAuthenticator
+class LDAP final : public IAuthenticator
 {
 public:
     /// @brief Defines the LDAP version protocol.

@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON) 
-find_package(SOCI COMPONENTS postgresql sqlite3 REQUIRED)
+find_package(SOCI COMPONENTS Core PostgreSQL REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(Boost COMPONENTS program_options date_time REQUIRED)
@@ -63,7 +63,7 @@ add_executable(cctReviewService
                src/cctPostgresService.cpp)
 
 target_link_libraries(cctReviewService
-                      PRIVATE SOCI::soci_postgresql SOCI::soci_sqlite3
+                      PRIVATE SOCI::Core SOCI::PostgreSQL
                               #OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB
                               Boost::program_options
                               spdlog::spdlog

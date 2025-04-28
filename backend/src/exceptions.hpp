@@ -5,7 +5,7 @@ namespace CCTService
 {
 /// @brief This should result in a 403 FORBIDDEN error.
 /// @copyright Ben Baker (UUSS) distributed under the MIT license.
-class InvalidPermissionException : public std::exception 
+class InvalidPermissionException final : public std::exception 
 {
 public:
     InvalidPermissionException(const std::string &message) :
@@ -26,7 +26,7 @@ private:
 };
 /// @brief This should result in a 400 Bad Request error.
 /// @copyright Ben Baker (UUSS) distributed under the MIT license.
-class BadRequestException : public std::exception 
+class BadRequestException final : public std::exception 
 {
 public:
     BadRequestException(const std::string &message) :
@@ -47,7 +47,7 @@ private:
 };
 /// @brief This should result in a 501 not-implemented error.
 /// @copyright Ben Baker (UUSS) distributed under the MIT license.
-class UnimplementedException : public std::exception 
+class UnimplementedException final : public std::exception 
 {
 public:
     UnimplementedException(const std::string &message) :
