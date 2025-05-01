@@ -570,6 +570,15 @@ DELETE FROM NetMag WHERE magid = :magid AND magalgo = :algorithm
                 soci::use(*magnitudeIdentifier),
                 soci::use(magnitudeAlgorithm);
 
+    // Delete the eventprefmag
+    std::string deleteEventPrefMagQuery{
+R"'''(
+DELETE FROM eventprefmag WHERE magid = :magid;
+)'''"
+    };  
+    *session << deleteEventPrefMagQuery,
+                soci::use(*magnitudeIdentifier);
+
     // Try to update the preferred magnitude
     std::string magPrefQuery{
 R"'''(
