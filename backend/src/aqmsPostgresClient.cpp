@@ -348,6 +348,7 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
     auto magnitudeType = networkMagnitude.getMagnitudeType();
     auto authority = networkMagnitude.getAuthority();
     auto subSource = networkMagnitude.getSubSource();
+    int localCommit{1};
     *session << insertNetMagQuery,
                 soci::use(originIdentifier), //networkMagnitude.getOriginIdentifier()),
                 soci::use(roundedMagnitude), //networkMagnitude.getMagnitude()),
@@ -362,10 +363,11 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
                 soci::use(distanceInsert, distanceIndicator),
                 soci::use(quality, nullIndicator),
                 soci::use(stringReviewFlag, reviewFlagIndicator),
-                soci::use(commit),
+                soci::use(localCommit),
                 soci::into(magnitudeIdentifier);
 
     // TODO I think this is called by prefMagOfEvent function
+/*
     std::string setPrefMagTypeQuery{
 R"'''(
 SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
@@ -373,23 +375,27 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
     };
     const int bypassMagPrefRules{0}; // Don't bypass magpref rules
     const int bumpEventVersion{0}; // Don't bump event version
+    int status{0};
     *session << setPrefMagTypeQuery,
                 soci::use(eventIdentifier),
                 soci::use(magnitudeIdentifier), //networkMagnitude.getIdentifier()),
                 soci::use(bypassMagPrefRules), // Don't bypass magpref rules
                 soci::use(bumpEventVersion), 
-                soci::use(commit); //  Commit happens later
-
-/*
+                soci::use(commit),
+                soci::into(status); //  Commit happens later
+    spdlog::info("Status from epref.setprefmag_magtype: " + std::to_string(status));
+*/
     std::string setPrefMagOfEventQuery{
 R"''''(
 SELECT magpref.setPrefMagOfEvent(:evid, :commit)
 )''''"
     };
+    int64_t prefMagStatus{-1};
     *session << setPrefMagOfEventQuery,
                 soci::use(eventIdentifier),
-                soci::use(commit); 
-*/
+                soci::use(localCommit),
+                soci::into(prefMagStatus);
+    spdlog::info("Status from setPrefMagOfEvent: " + std::to_string(prefMagStatus));
 
     std::string creditQuery{
 R"'''(
@@ -493,6 +499,7 @@ UPDATE NetMag SET (magnitude, magtype, auth, subsource, magalgo, nsta, nobs, gap
 
     // Update the preferred magnitude 
     // TODO I think this is called by prefMagOfEvent function
+/*
     std::string setPrefMagTypeQuery{
 R"'''(
 SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
@@ -506,11 +513,10 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::use(bypassMagPrefRules), // Don't bypass magpref rules
                 soci::use(bumpEventVersion),
                 soci::use(commit); //  Commit happens later
+*/
 
-
-/*
-    // Refrain from doing this for now. 
-    // AQMS is not to be trusted to figure out the preferred magnitude.
+    int64_t prefMagResult{0};
+    int localCommit{1};
     std::string setPrefMagOfEventQuery{
 R"''''(
 SELECT magpref.setPrefMagOfEvent(:evid, :commit)
@@ -518,8 +524,9 @@ SELECT magpref.setPrefMagOfEvent(:evid, :commit)
     };
     *session << setPrefMagOfEventQuery,
                 soci::use(eventIdentifier),
-                soci::use(commit);
-*/
+                soci::use(localCommit),
+                soci::into(prefMagResult);
+    spdlog::info("Update magpref.setPRefMagOfEvent result is " + std::to_string(prefMagResult));
 
     std::string creditQuery{
 R"'''(
