@@ -379,7 +379,8 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::use(bypassMagPrefRules), // Don't bypass magpref rules
                 soci::use(bumpEventVersion), 
                 soci::use(commit); //  Commit happens later
-    
+
+/*
     std::string setPrefMagOfEventQuery{
 R"''''(
 SELECT magpref.setPrefMagOfEvent(:evid, :commit)
@@ -388,6 +389,7 @@ SELECT magpref.setPrefMagOfEvent(:evid, :commit)
     *session << setPrefMagOfEventQuery,
                 soci::use(eventIdentifier),
                 soci::use(commit); 
+*/
 
     std::string creditQuery{
 R"'''(
