@@ -400,7 +400,7 @@ SELECT magpref.setPrefMagOfEvent(:evid, :commit)
     /// Make sure this is in the event pref mag
     std::string setEventPrefMag{
 R"''''(
-INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid) ON CONFLICT (magid) DO NOTHING;
+INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid);
 )''''"
     };
     *session << setEventPrefMag,
