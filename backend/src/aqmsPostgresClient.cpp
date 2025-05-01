@@ -365,7 +365,7 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
                 soci::use(stringReviewFlag, reviewFlagIndicator),
                 soci::use(localCommit),
                 soci::into(magnitudeIdentifier);
-
+    spdlog::info("insertNetMag returned magnitude identifier: " + std::to_string(magnitudeIdentifier));
     // TODO I think this is called by prefMagOfEvent function
 /*
     std::string setPrefMagTypeQuery{
@@ -396,6 +396,17 @@ SELECT magpref.setPrefMagOfEvent(:evid, :commit)
                 soci::use(localCommit),
                 soci::into(prefMagStatus);
     spdlog::info("Status from setPrefMagOfEvent: " + std::to_string(prefMagStatus));
+
+    /// Make sure this is in the event pref mag
+    std::string setEventPrefMag{
+R"''''(
+INSERT INTO eventprefmag :evid, :magtype, :magid ON CONFLICT (magid) DO NOTHING
+)''''"
+    };
+    *session << setEventPrefMag,
+                soci::use(eventIdentifier),
+                soci::use(magnitudeType),
+                soci::use(magnitudeIdentifier);
 
     std::string creditQuery{
 R"'''(
