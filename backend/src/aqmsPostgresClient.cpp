@@ -505,6 +505,7 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::use(bumpEventVersion),
                 soci::use(commit); //  Commit happens later
 
+
 /*
     // Refrain from doing this for now. 
     // AQMS is not to be trusted to figure out the preferred magnitude.
