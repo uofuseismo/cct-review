@@ -579,10 +579,11 @@ DELETE FROM eventprefmag WHERE magid = :magid;
     *session << deleteEventPrefMagQuery,
                 soci::use(*magnitudeIdentifier);
 
-    // Try to update the preferred magnitude
+    // Try to update the preferred magnitude.  This is the last
+    // statement so commit it.
     std::string magPrefQuery{
 R"'''(
-SELECT magpref.setPrefMagOfEventByPrefor(:evid)
+SELECT magpref.setPrefMagOfEventByPrefor(:evid, 1);
 )'''"
     };
     *session << magPrefQuery,
