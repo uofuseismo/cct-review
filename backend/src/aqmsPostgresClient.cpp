@@ -562,11 +562,13 @@ void AQMSPostgresClient::deleteNetworkMagnitude(
     // Delete the magnitude
     std::string deleteNetMagQuery{
 R"'''(
-DELETE FROM NetMag WHERE magid = :magid
+DELETE FROM NetMag WHERE magid = :magid AND magalgo = :algorithm
 )'''"
     };
+    std::string magnitudeAlgorithm{MAGNITUDE_ALGORITHM};
     *session << deleteNetMagQuery,
-                soci::use(*magnitudeIdentifier);
+                soci::use(*magnitudeIdentifier),
+                soci::use(magnitudeAlgorithm);
 
     // Try to update the preferred magnitude
     std::string magPrefQuery{
