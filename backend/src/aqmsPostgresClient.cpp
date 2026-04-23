@@ -198,16 +198,18 @@ AQMSPostgresClient::AQMSPostgresClient(
 void AQMSPostgresClient::insertNetworkMagnitude(
     const std::string &user,
     const std::string &eventIdentifier,
-    const NetMag &networkMagnitude)
+    const NetMag &networkMagnitude,
+    const bool updatePrefMag)
 {
     auto identifier = ::convertEventIdentifier(eventIdentifier);
-    insertNetworkMagnitude(user, identifier, networkMagnitude);
+    insertNetworkMagnitude(user, identifier, networkMagnitude, updatePrefMag);
 }
 
 void AQMSPostgresClient::insertNetworkMagnitude(
     const std::string &user,
     const int64_t eventIdentifier,
-    const NetMag &networkMagnitudeIn)
+    const NetMag &networkMagnitudeIn,
+    const bool updatePrefMag)
 {
     if (mwCodaMagnitudeExists(eventIdentifier))
     {
@@ -248,6 +250,12 @@ void AQMSPostgresClient::insertNetworkMagnitude(
     if (!networkMagnitude.haveAuthority())
     {
         throw std::invalid_argument("Authority not set");
+    }
+    auto currentPreferredMagnitudeIdentifier
+        = getPreferredMagnitudeIdentifier(eventIdentifier);
+    if (currentPreferredMagnitudeIdentifier == std::nullopt)
+    {
+        spdlog::warn("Currently there is no preferred magnitude");
     }
 
     // Get values for insertNetMag function
@@ -328,7 +336,26 @@ void AQMSPostgresClient::insertNetworkMagnitude(
     }
     if (!stringReviewFlag.empty()){reviewFlagIndicator = soci::i_ok;}
     */
-     
+    bool doPrefMagLogic{false};
+    if (updatePrefMag)
+    {
+        doPrefMagLogic = true;
+        spdlog::info("Will insert Mw,Coda netmag and update preferred magnitude");
+    }
+    else
+    {
+        if (currentPreferredMagnitudeIdentifier == std::nullopt)
+        {
+            doPrefMagLogic = true;
+            spdlog::warn("No current preferred magnitude - must employ pref mag logic");
+        }
+        else
+        {
+            doPrefMagLogic = false;
+            spdlog::info("Will insert Mw,Coda netmag without updating preferred magnitude; current pref mag is "
+                       + std::to_string (*currentPreferredMagnitudeIdentifier));
+        }
+    } 
     // Let the commit fun begin
     {
     soci::transaction tr(*session);
@@ -365,7 +392,8 @@ SELECT epref.insertNetMag(:orid, :mag, :type, :auth, :subsource, :magalgo, :nsta
                 soci::use(stringReviewFlag, reviewFlagIndicator),
                 soci::use(localCommit),
                 soci::into(magnitudeIdentifier);
-    spdlog::info("insertNetMag returned magnitude identifier: " + std::to_string(magnitudeIdentifier));
+    spdlog::info("insertNetMag returned magnitude identifier: "
+               + std::to_string(magnitudeIdentifier));
     // TODO I think this is called by prefMagOfEvent function
 /*
     std::string setPrefMagTypeQuery{
@@ -385,29 +413,32 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::into(status); //  Commit happens later
     spdlog::info("Status from epref.setprefmag_magtype: " + std::to_string(status));
 */
-    std::string setPrefMagOfEventQuery{
+    if (doPrefMagLogic)
+    {
+        std::string setPrefMagOfEventQuery{
 R"''''(
-SELECT magpref.setPrefMagOfEvent(:evid, :commit)
+SELECT magpref.setPrefMagOfEvent(:evid, :commit);
 )''''"
-    };
-    int64_t prefMagStatus{-1};
-    *session << setPrefMagOfEventQuery,
-                soci::use(eventIdentifier),
-                soci::use(localCommit),
-                soci::into(prefMagStatus);
-    spdlog::info("Status from setPrefMagOfEvent: " + std::to_string(prefMagStatus));
+        };
+        int64_t prefMagStatus{-1};
+        *session << setPrefMagOfEventQuery,
+                    soci::use(eventIdentifier),
+                    soci::use(localCommit),
+                    soci::into(prefMagStatus);
+        spdlog::info("Status from setPrefMagOfEvent: "
+                   + std::to_string(prefMagStatus));
 
-    /// Make sure this is in the event pref mag
-    std::string setEventPrefMag{
+        /// Make sure this is in the event pref mag
+        std::string setEventPrefMag{
 R"''''(
 INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid);
 )''''"
-    };
-    *session << setEventPrefMag,
-                soci::use(eventIdentifier),
-                soci::use(magnitudeType),
-                soci::use(magnitudeIdentifier);
-
+        };
+        *session << setEventPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::use(magnitudeType),
+                    soci::use(magnitudeIdentifier);
+    }
     std::string creditQuery{
 R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
@@ -419,24 +450,27 @@ INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
                 soci::use(netmag), //std::string  {"NETMAG"}),
                 soci::use(user);
     tr.commit();
-    }
+    } // End transaction
 }
 
 /// Update
 void AQMSPostgresClient::updateNetworkMagnitude(
     const std::string &user,
     const std::string &eventIdentifier,
-    const NetMag &networkMagnitude)
+    const NetMag &networkMagnitude,
+    const bool updatePrefMag)
 {
     auto identifier = ::convertEventIdentifier(eventIdentifier);
-    updateNetworkMagnitude(user, identifier, networkMagnitude);
+    updateNetworkMagnitude(user, identifier, networkMagnitude,
+                           updatePrefMag);
 }
  
 
 void AQMSPostgresClient::updateNetworkMagnitude(
     const std::string &user,
     const int64_t eventIdentifier,
-    const NetMag &networkMagnitudeIn)
+    const NetMag &networkMagnitudeIn,
+    const bool updatePrefMag)
 {
     auto networkMagnitude = networkMagnitudeIn;
     if (!mwCodaMagnitudeExists(eventIdentifier))
@@ -525,20 +559,21 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::use(bumpEventVersion),
                 soci::use(commit); //  Commit happens later
 */
-
-    int64_t prefMagResult{0};
-    int localCommit{1};
-    std::string setPrefMagOfEventQuery{
+    if (updatePrefMag)
+    {
+        int64_t prefMagResult{0};
+        int localCommit{1};
+        std::string setPrefMagOfEventQuery{
 R"''''(
 SELECT magpref.setPrefMagOfEvent(:evid, :commit)
 )''''"
     };
-    *session << setPrefMagOfEventQuery,
-                soci::use(eventIdentifier),
-                soci::use(localCommit),
-                soci::into(prefMagResult);
-    spdlog::info("Update magpref.setPRefMagOfEvent result is " + std::to_string(prefMagResult));
-
+        *session << setPrefMagOfEventQuery,
+                    soci::use(eventIdentifier),
+                    soci::use(localCommit),
+                    soci::into(prefMagResult);
+       spdlog::info("Update magpref.setPfefMagOfEvent result is " + std::to_string(prefMagResult));
+    }
     std::string creditQuery{
 R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
@@ -772,6 +807,51 @@ SELECT prefor FROM event WHERE evid=:identifier LIMIT 1;
         throw std::runtime_error("Failed to get preferred origin identifier");
     }
     return originIdentifier;
+}
+
+std::optional<int64_t> AQMSPostgresClient::getPreferredMagnitudeIdentifier(
+    const int64_t eventIdentifier) const
+{
+    if (pImpl->mConnection == nullptr)
+    {   
+        throw std::runtime_error("Connection is NULL");
+    }   
+    if (!pImpl->mConnection->isConnected())
+    {   
+        spdlog::warn("Reconnecting to AQMS postgres");
+        pImpl->mConnection->connect();
+    }   
+    if (!pImpl->mConnection->isConnected())
+    {   
+         spdlog::critical("AQMS postgres connection broken");
+         throw std::runtime_error("AQMS database connection broken");
+    }   
+
+    int64_t magnitudeIdentifier{-1};
+    std::string query{
+R"'''(
+SELECT COALESCE(prefmag FROM event WHERE evid=:identifier LIMIT 1, -1);
+)'''"
+    };
+    auto session
+         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
+    try 
+    {   
+        *session << query,
+                    soci::use(eventIdentifier),
+                    soci::into(magnitudeIdentifier);
+    }   
+    catch (const std::exception &e) 
+    {
+        spdlog::error("Preferred origin query failed with "
+                    + std::string {e.what()});
+    }
+    if (magnitudeIdentifier ==-1)
+    {
+        return std::nullopt;
+        //throw std::runtime_error("Failed to get preferred magnitude identifier");
+    }
+    return std::optional<int64_t> (magnitudeIdentifier);
 }
 
 /// Destructor

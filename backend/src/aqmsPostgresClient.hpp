@@ -1,6 +1,7 @@
 #ifndef CCT_BACKEND_SERVICE_DATABASE_AQMS_POSTGRES_CLIENT_HPP
 #define CCT_BACKEND_SERVICE_DATABASE_AQMS_POSTGRES_CLIENT_HPP
 #include <memory>
+#include <optional>
 namespace CCTService
 {
  class PostgreSQL;
@@ -25,12 +26,16 @@ public:
     /// @}
 
     /// @brief Insert a network magnitude - this is an accept action.
-    void insertNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude);
-    void insertNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude);
+    void insertNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude,
+                                bool updatePrefMag);
+    void insertNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude,
+                                bool updatePrefMag);
     /// @brief Updates a network magnitude - not sure how this happens
     ///        but it could.
-    void updateNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude);
-    void updateNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude);
+    void updateNetworkMagnitude(const std::string &user, const std::string &eventIdentifier, const NetMag &networkMagnitude,
+                                const bool updatePrefMag);
+    void updateNetworkMagnitude(const std::string &user, int64_t eventIdentifier, const NetMag &networkMagnitude,
+                                const bool updatePrefMag);
     /// @brief Delete a network magnitude.  This is for a cancel action.
     void deleteNetworkMagnitude(const std::string &user, const std::string &eventIdentifier);
     void deleteNetworkMagnitude(const std::string &user, int64_t eventIdentifier);
@@ -40,6 +45,7 @@ public:
     [[nodiscard]] bool mwCodaMagnitudeExists(int64_t eventIdentifier) const;
     [[nodiscard]] int64_t getPreferredOriginIdentifier(const std::string &eventIdentifier) const;
     [[nodiscard]] int64_t getPreferredOriginIdentifier(int64_t eventIdentifier) const;
+    [[nodiscard]] std::optional<int64_t> getPreferredMagnitudeIdentifier(int64_t eventIdentifier) const;
     /// @name Destructors
     /// @{
 

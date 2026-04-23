@@ -737,19 +737,23 @@ std::string Callback::operator()(
                     spdlog::info("Will attempt to update Mw,coda magnitude for "
                                + eventIdentifier + " for user " + credentials.user);
                     networkMagnitude.setIdentifier(*existingMagnitudeIdentifier);
+                    constexpr bool updatePrefMag{false};
                     pImpl->mAQMSClients->at(schema)
                          ->updateNetworkMagnitude(credentials.user,
                                                   eventIdentifier,
-                                                  networkMagnitude);
+                                                  networkMagnitude,
+                                                  updatePrefMag);
                 }
                 else
                 {
+                    constexpr bool updatePrefMag{false};
                     spdlog::info("Will attempt to create Mw,coda magnitude for "
                                + eventIdentifier + " for user " + credentials.user);
                     pImpl->mAQMSClients->at(schema)
                          ->insertNetworkMagnitude(credentials.user,
                                                   eventIdentifier,
-                                                  networkMagnitude);
+                                                  networkMagnitude,
+                                                  updatePrefMag);
                 }
 //spdlog::info(originIdentifier);
                 pImpl->mCCTPostgresService->acceptEvent(schema, eventIdentifier);
