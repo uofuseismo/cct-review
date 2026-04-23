@@ -18,7 +18,8 @@ public:
              const int port,
              const std::string &organizationalUnitName,
              const std::string &domainComponent,
-             const CCTService::LDAP::Version ldapVersion)
+             const CCTService::LDAP::Version ldapVersion,
+             const bool maintainConnection)
     {
         if (serverAddress.empty())
         {
@@ -31,6 +32,7 @@ public:
         mServerAddress = serverAddress + ":" + std::to_string(port);
         mDNSuffix = organizationalUnitName + "," + domainComponent;
         mVersion = ldapVersion;
+        mMaintainConnection = maintainConnection;
     }
     ~LDAPImpl()
     {
@@ -96,6 +98,7 @@ public:
     std::string mServerAddress;
     std::string mDNSuffix;
     Version mVersion{Version::Three};
+    bool mMaintainConnection{false};
     bool mBound{false};
 };
 
@@ -104,14 +107,17 @@ CCTService::LDAP::LDAP(const std::string &serverAddress,
                        const int port,
                        const std::string &organizationalUnitName,
                        const std::string &domainComponent,
-                       const CCTService::LDAP::Version ldapVersion) :
+                       const CCTService::LDAP::Version ldapVersion,
+                       const bool maintainConnection) :
     pImpl(std::make_unique<LDAPImpl> (serverAddress,
                                       port,
                                       organizationalUnitName,
                                       domainComponent,
-                                      ldapVersion))
+                                      ldapVersion,
+                                      maintainConnection))
 {
     pImpl->initialize();
+    if (!pImpl->mMaintainConnection){pImpl->unbind();}
 }
  
 /// Constructor
@@ -120,12 +126,14 @@ CCTService::LDAP::LDAP(const std::string &serverAddress,
                        const std::string &organizationalUnitName,
                        const std::string &domainComponent,
                        const CCTService::LDAP::Version ldapVersion,
-                       const CCTService::LDAP::TLSVerifyClient verify) :
+                       const CCTService::LDAP::TLSVerifyClient verify,
+                       const bool maintainConnection) :
     pImpl(std::make_unique<LDAPImpl> (serverAddress,
                                       port,
                                       organizationalUnitName,
                                       domainComponent,
-                                      ldapVersion))
+                                      ldapVersion,
+                                      maintainConnection))
 { 
     constexpr int overwrite{1};
     if (verify == CCTService::LDAP::TLSVerifyClient::Never)
@@ -161,6 +169,7 @@ CCTService::LDAP::LDAP(const std::string &serverAddress,
         }
     }
     pImpl->initialize();
+    if (!pImpl->mMaintainConnection){pImpl->unbind();}
 }
 
 /// @result True indicates the LDAP authenticator is initialized.
@@ -184,6 +193,18 @@ bool CCTService::LDAP::authenticate(const std::string &user,
     struct berval credential;
     credential.bv_val = temporaryPassword.data();
     credential.bv_len = temporaryPassword.size();
+
+    // Verify my connection
+    if (!pImpl->mMaintainConnection)
+    {
+        pImpl->initialize();
+    }
+    if (!pImpl->mBound)
+    {
+        throw std::runtime_error("No LDAP connection");
+    }
+
+    // Autenticate this user
     auto returnCode
         = ldap_sasl_bind_s(pImpl->mLDAP, dn.c_str(),
                            LDAP_SASL_SIMPLE,
@@ -205,6 +226,8 @@ bool CCTService::LDAP::authenticate(const std::string &user,
     {
         spdlog::debug("LDAP::authenticate: Validated credentials for " + user);
     }
+    if (!pImpl->mMaintainConnection){pImpl->unbind();}
+    // LDAP says the user is okay - now add the user
     try
     {
         this->add(user);

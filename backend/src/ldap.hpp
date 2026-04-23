@@ -45,11 +45,17 @@ public:
     /// @param[in] organizationUnitName  The organization unit - e.g., ou=Groups
     /// @param[in] domainComponent       The domain component e.g., dc=gl,dc=google,dc=com
     /// @param[in] version               The LDAP version protocol.
+    /// @param[in] maintainConnection    If true then the authenticator will 
+    ///                                  attempt to keep alive the LDAP 
+    ///                                  connection.  This can speed things up
+    ///                                  for a lot of logins but crash when
+    ///                                  LDAP servers are cycled.
     LDAP(const std::string &serverAddress,
          int port,
          const std::string &organizationalUnitName,
          const std::string &domainComponent,
-         const Version version = Version::Three);
+         const Version version = Version::Three,
+         const bool maintainConnection = true);
     /// @brief Constructs an LDAP authenticator with the given server
     ///        address and port.
     /// @param[in] serverAddress         The server address - e.g., ldaps://server.domain.com
@@ -61,12 +67,18 @@ public:
     ///                                  certificate validation.  This will
     ///                                  result in an environment variable being
     ///                                  adjusted.
+    /// @param[in] maintainConnection    If true then the authenticator will 
+    ///                                  attempt to keep alive the LDAP 
+    ///                                  connection.  This can speed things up
+    ///                                  for a lot of logins but crash when
+    ///                                  LDAP servers are cycled.
     LDAP(const std::string &serverAddress,
          int port,
          const std::string &organizationalUnitName,
          const std::string &domainComponent,
          const Version version,
-         const TLSVerifyClient tlsVerifyClient);
+         const TLSVerifyClient tlsVerifyClient,
+         bool maintainConnection = true);
     /// @result True indicates the LDAP authenticator is initialized.
     [[nodiscard]] bool isInitialized() const noexcept;
     /// @result Returns true if the user with the password was authenticated.
