@@ -306,7 +306,7 @@ handleRequest(
     // Returns a server error response
     auto const serverError = [&request](boost::beast::string_view what)
     {
-        spdlog::info("Server error");
+        spdlog::info("Server error: " + std::string {what});
         boost::beast::http::response<boost::beast::http::string_body> result
         {
             boost::beast::http::status::internal_server_error,
