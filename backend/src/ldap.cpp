@@ -61,7 +61,7 @@ public:
                     + mServerAddress);
         if (ldap_initialize(&mLDAP, mServerAddress.c_str()) != LDAP_SUCCESS)
         {
-            mBound = true;
+            mBound = false;
             spdlog::critical(
                 "LDAPImpl::initialize: Failed to bind to LDAP server at: "
               + mServerAddress);
@@ -90,6 +90,7 @@ public:
             unbind();
             return;
         }
+        mBound = true;
     }
 
     ::LDAP *mLDAP{nullptr};
