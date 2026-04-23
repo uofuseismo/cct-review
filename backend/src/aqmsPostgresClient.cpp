@@ -496,6 +496,33 @@ void AQMSPostgresClient::updateNetworkMagnitude(
     {
         throw std::invalid_argument("Authority not set");
     }
+    auto currentPreferredMagnitudeIdentifier
+        = getPreferredMagnitudeIdentifier(eventIdentifier);
+    if (currentPreferredMagnitudeIdentifier == std::nullopt)
+    {   
+        spdlog::warn("Currently there is no preferred magnitude");
+    }   
+
+    bool doPrefMagLogic{false};
+    if (updatePrefMag)
+    {
+        doPrefMagLogic = true;
+        spdlog::info("Will update Mw,Coda netmag and update preferred magnitude");
+    }
+    else
+    {           
+        if (currentPreferredMagnitudeIdentifier == std::nullopt)
+        {       
+            doPrefMagLogic = true;
+            spdlog::warn("No current preferred magnitude - must employ pref mag logic in update");
+        }
+        else    
+        {
+            doPrefMagLogic = false;
+            spdlog::info("Will update Mw,Coda netmag without updating preferred magnitude; current pref mag is "
+                       + std::to_string (*currentPreferredMagnitudeIdentifier));
+        }       
+    }           
 
     // Get values for update - just overwrite the entire row 
     auto [nStationsInsert, nStationsIndicator]
@@ -559,7 +586,7 @@ SELECT epref.setprefmag_magtype(:evid, :magid, :evtpref, :bump, :commit)
                 soci::use(bumpEventVersion),
                 soci::use(commit); //  Commit happens later
 */
-    if (updatePrefMag)
+    if (doPrefMagLogic)
     {
         int64_t prefMagResult{0};
         int localCommit{1};
@@ -609,10 +636,32 @@ void AQMSPostgresClient::deleteNetworkMagnitude(
         spdlog::warn("Network magnitude does not exist; skipping");
         return;
     }
+    auto currentPreferredMagnitudeIdentifier
+        = getPreferredMagnitudeIdentifier(eventIdentifier);
+    if (currentPreferredMagnitudeIdentifier == std::nullopt)
+    {
+        spdlog::warn("Currently there is no preferred magnitude");
+    }
+    bool changePrefMag{false};
+    bool deletePrefMag{false};
+    if (currentPreferredMagnitudeIdentifier)
+    {
+        if (*currentPreferredMagnitudeIdentifier == magnitudeIdentifier)
+        {
+            changePrefMag = true;
+            deletePrefMag = true;
+            spdlog::warn("Mw,Coda is currently preferred - will delete it ad use prefmag logic to update");
+        }
+    }
+    else
+    {
+        changePrefMag = true;
+        spdlog::warn("There exists no preferred magnitude - will attempt to update");
+    }
 
     // Begin the transaction
     spdlog::info("Attempting to delete magnitude "
-               + std::to_string (*magnitudeIdentifier) + " from NetMag");
+               + std::to_string (*magnitudeIdentifier) + " from NetMag.");
     constexpr int commit{0};
     auto session
         = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
@@ -631,23 +680,29 @@ DELETE FROM NetMag WHERE magid = :magid AND magalgo = :algorithm
                 soci::use(magnitudeAlgorithm);
 
     // Delete the eventprefmag
-    std::string deleteEventPrefMagQuery{
+    if (deletePrefMag)
+    {
+        std::string deleteEventPrefMagQuery{
 R"'''(
 DELETE FROM eventprefmag WHERE magid = :magid;
 )'''"
-    };  
-    *session << deleteEventPrefMagQuery,
-                soci::use(*magnitudeIdentifier);
+        };  
+        *session << deleteEventPrefMagQuery,
+                    soci::use(*magnitudeIdentifier);
+    }
 
     // Try to update the preferred magnitude.  This is the last
     // statement so commit it.
-    std::string magPrefQuery{
+    if (changePrefMag)
+    {
+        std::string magPrefQuery{
 R"'''(
 SELECT magpref.setPrefMagOfEventByPrefor(:evid, 1);
 )'''"
     };
-    *session << magPrefQuery,
-                soci::use(eventIdentifier);
+        *session << magPrefQuery,
+                    soci::use(eventIdentifier);
+    }
 
     tr.commit();
     }
