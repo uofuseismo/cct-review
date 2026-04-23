@@ -184,7 +184,7 @@ int main(int argc, char* argv[])
         int ldapPort{std::stoi(std::getenv("LDAP_PORT"))};
         std::string ldapOrganizationUnit{std::getenv("LDAP_ORGANIZATION_UNIT")};
         std::string ldapDomainComponent{std::getenv("LDAP_DOMAIN_COMPONENT")};
-        constexpr bool maintainConnection{false};
+        constexpr bool maintainConnection{true};
         ldapAuthenticator
             = std::make_shared<CCTService::LDAP> 
                 (ldapServerAddress,
