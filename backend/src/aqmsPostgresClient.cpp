@@ -885,16 +885,32 @@ std::optional<int64_t> AQMSPostgresClient::getPreferredMagnitudeIdentifier(
     int64_t magnitudeIdentifier{-1};
     std::string query{
 R"'''(
-SELECT COALESCE(prefmag FROM event WHERE evid=:identifier LIMIT 1, -1);
+SELECT prefmag FROM event WHERE evid=:identifier LIMIT 1;
 )'''"
     };
+    soci::indicator indicator;
     auto session
          = reinterpret_cast<soci::session *> (pImpl->mConnection->getSession());
     try 
     {   
         *session << query,
                     soci::use(eventIdentifier),
-                    soci::into(magnitudeIdentifier);
+                    soci::into(magnitudeIdentifier, indicator);
+        if (indicator == soci::i_ok)
+        {
+            spdlog::debug("Found preferred magnitude identifier of "
+                        + std::to_string(magnitudeIdentifier)); 
+        }
+        else if (indicator == soci::i_null)
+        {
+            spdlog::warn("Preferred magnitude not found");
+            magnitudeIdentifier =-1;
+        }
+        else
+        {
+            spdlog::error("Unhandled case - setting magnitude identifier to -1");
+            magnitudeIdentifier =-1;
+        }
     }   
     catch (const std::exception &e) 
     {
