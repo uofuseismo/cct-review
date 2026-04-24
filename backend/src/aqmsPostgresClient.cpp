@@ -465,14 +465,16 @@ SELECT magpref.setPrefMag(:evid, :magid, :commit);
                        + std::to_string(returnedMagnitudeIdentifier));
         }
 
-        std::string insertIntoEventPrefMag{
-R"""(
-INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid);
-)"""
-        };
-        *session << insertIntoEventPrefMag,
+        /// Make sure this is in the event pref mag
+        std::string setEventPrefMag{
+R"''''(
+INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid);
+)''''"
+        };   
+        *session << setEventPrefMag,
                     soci::use(eventIdentifier),
-                    soci::into(*currentPreferredMagnitudeIdentifier);
+                    soci::use(magnitudeType),
+                    soci::use(magnitudeIdentifier);
 
         std::string setBumpEventVersion{
 R"''''(
@@ -668,14 +670,15 @@ SELECT magpref.setPrefMag(:evid, :magid, :commit);
                    + std::to_string(returnedMagnitudeIdentifier));
 
         // Upsert it
-        std::string insertIntoEventPrefMag{
-R"""(
-INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid) ON CONFLICT DO NOTHING;
-)"""
+        std::string setEventPrefMag{
+R"''''(
+INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid) ON CONFLICT DO NOTHING;
+)''''"
         };
-        *session << insertIntoEventPrefMag,
+        *session << setEventPrefMag,
                     soci::use(eventIdentifier),
-                    soci::into(*currentPreferredMagnitudeIdentifier);
+                    soci::use(magnitudeType),
+                    soci::use(magnitudeIdentifier);
 
         std::string setBumpEventVersion{
 R"''''(
@@ -812,16 +815,6 @@ SELECT magpref.setPrefMagOfEventByPrefor(:evid, 1);
     }
     else
     {
-
-        std::string insertIntoEventPrefMag{
-R"""(
-INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid) ON CONFLICT DO NOTHING;
-)"""
-        };
-        *session << insertIntoEventPrefMag,
-                    soci::use(eventIdentifier),
-                    soci::into(*currentPreferredMagnitudeIdentifier);
-
 /*
         int64_t returnedMagnitudeIdentifier;
         std::string setExistingPrefMag{
