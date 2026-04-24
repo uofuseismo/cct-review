@@ -439,6 +439,37 @@ INSERT INTO eventprefmag (evid, magtype, magid) VALUES (:evid, :magtype, :magid)
                     soci::use(magnitudeType),
                     soci::use(magnitudeIdentifier);
     }
+    else
+    {
+        int64_t returnedMagnitudeIdentifier;
+        std::string setExistingPrefMag{
+ R"""(
+SELECT magpref.setPrefMag(:evid, :magid, :commit); 
+)"""    
+        };
+        *session << setExistingPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::use(*currentPreferredMagnitudeIdentifier),
+                    soci::use(commit),
+                    soci::into(returnedMagnitudeIdentifier);
+        spdlog::info("Current prefmag " 
+                   + std::to_string(*currentPreferredMagnitudeIdentifier)
+                   + " returned prefmag "
+                   + std::to_string(returnedMagnitudeIdentifier));
+
+        std::string setBumpEventVersion{
+R"''''(
+SELECT epref.bump_version(:evid);
+)''''"
+        };  
+        int newVersion{-1};
+        *session << setBumpEventVersion,
+                    soci::use(eventIdentifier),
+                    soci::into(newVersion);
+        spdlog::info("Incremented event version to "
+                   + std::to_string(newVersion));
+    }
+
     std::string creditQuery{
 R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
@@ -601,6 +632,37 @@ SELECT magpref.setPrefMagOfEvent(:evid, :commit)
                     soci::into(prefMagResult);
        spdlog::info("Update magpref.setPfefMagOfEvent result is " + std::to_string(prefMagResult));
     }
+    else
+    {   
+        int64_t returnedMagnitudeIdentifier;
+        std::string setExistingPrefMag{
+ R"""(
+SELECT magpref.setPrefMag(:evid, :magid, :commit); 
+)"""    
+        };
+        *session << setExistingPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::use(*currentPreferredMagnitudeIdentifier),
+                    soci::use(commit),
+                    soci::into(returnedMagnitudeIdentifier);
+        spdlog::info("Updated current prefmag " 
+                   + std::to_string(*currentPreferredMagnitudeIdentifier)
+                   + " returned prefmag "
+                   + std::to_string(returnedMagnitudeIdentifier));
+
+        std::string setBumpEventVersion{
+R"''''(
+SELECT epref.bump_version(:evid);
+)''''"
+        };
+        int newVersion{-1};
+        *session << setBumpEventVersion,
+                    soci::use(eventIdentifier),
+                    soci::into(newVersion);
+        spdlog::info("Updated event version to "
+                   + std::to_string(newVersion));
+    }   
+
     std::string creditQuery{
 R"'''(
 INSERT INTO credit (id, tname, refer) VALUES (:id, :tname, :refer);
@@ -699,9 +761,40 @@ DELETE FROM eventprefmag WHERE magid = :magid;
 R"'''(
 SELECT magpref.setPrefMagOfEventByPrefor(:evid, 1);
 )'''"
-    };
+        };
         *session << magPrefQuery,
                     soci::use(eventIdentifier);
+    }
+    else
+    {
+/*
+        int64_t returnedMagnitudeIdentifier;
+        std::string setExistingPrefMag{
+ R"""(
+SELECT magpref.setPrefMag(:evid, :magid, :commit); 
+)"""    
+        };
+        *session << setExistingPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::use(*currentPreferredMagnitudeIdentifier),
+                    soci::use(commit),
+                    soci::into(returnedMagnitudeIdentifier);
+        spdlog::info("Current prefmag " 
+                   + std::to_string(*currentPreferredMagnitudeIdentifier)
+                   + " returned prefmag "
+                   + std::to_string(returnedMagnitudeIdentifier));
+*/
+        std::string setBumpEventVersion{
+R"''''(
+SELECT epref.bump_version(:evid);
+)''''"
+        };
+        int newVersion{-1};
+        *session << setBumpEventVersion,
+                    soci::use(eventIdentifier),
+                    soci::into(newVersion);
+        spdlog::info("Incremented event version to "
+                   + std::to_string(newVersion));
     }
 
     tr.commit();
