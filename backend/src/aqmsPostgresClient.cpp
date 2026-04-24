@@ -452,10 +452,27 @@ SELECT magpref.setPrefMag(:evid, :magid, :commit);
                     soci::use(*currentPreferredMagnitudeIdentifier),
                     soci::use(commit),
                     soci::into(returnedMagnitudeIdentifier);
-        spdlog::info("Current prefmag " 
-                   + std::to_string(*currentPreferredMagnitudeIdentifier)
-                   + " returned prefmag "
-                   + std::to_string(returnedMagnitudeIdentifier));
+        spdlog::debug("Current prefmag "
+                    + std::to_string(*currentPreferredMagnitudeIdentifier)
+                    + " returned prefmag "
+                    + std::to_string(returnedMagnitudeIdentifier));
+        if (*currentPreferredMagnitudeIdentifier !=
+            std::abs(returnedMagnitudeIdentifier))
+        {
+            spdlog::warn("Prefmag identifier changed from "
+                       + std::to_string(*currentPreferredMagnitudeIdentifier)
+                       + " to "
+                       + std::to_string(returnedMagnitudeIdentifier));
+        }
+
+        std::string insertIntoEventPrefMag{
+R"""(
+INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid);
+)"""
+        };
+        *session << insertIntoEventPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::into(*currentPreferredMagnitudeIdentifier);
 
         std::string setBumpEventVersion{
 R"''''(
@@ -650,6 +667,16 @@ SELECT magpref.setPrefMag(:evid, :magid, :commit);
                    + " returned prefmag "
                    + std::to_string(returnedMagnitudeIdentifier));
 
+        // Upsert it
+        std::string insertIntoEventPrefMag{
+R"""(
+INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid) ON CONFLICT DO NOTHING;
+)"""
+        };
+        *session << insertIntoEventPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::into(*currentPreferredMagnitudeIdentifier);
+
         std::string setBumpEventVersion{
 R"''''(
 SELECT epref.bump_version(:evid);
@@ -705,14 +732,20 @@ void AQMSPostgresClient::deleteNetworkMagnitude(
         spdlog::warn("Currently there is no preferred magnitude");
     }
     bool changePrefMag{false};
-    bool deletePrefMag{false};
+   // bool deletePrefMag{false};
     if (currentPreferredMagnitudeIdentifier)
     {
-        if (*currentPreferredMagnitudeIdentifier == magnitudeIdentifier)
+        if (*currentPreferredMagnitudeIdentifier == *magnitudeIdentifier)
         {
             changePrefMag = true;
-            deletePrefMag = true;
-            spdlog::warn("Mw,Coda is currently preferred - will delete it ad use prefmag logic to update");
+            //deletePrefMag = true;
+            spdlog::warn("Mw,Coda is currently preferred - will delete it then use prefmag logic to update");
+        }
+        else
+        {
+            spdlog::info("Mw,Coda magid "
+                       + std::to_string(*magnitudeIdentifier)
+                       + " is not preferred - will simply delete it");
         }
     }
     else
@@ -741,6 +774,17 @@ DELETE FROM NetMag WHERE magid = :magid AND magalgo = :algorithm
                 soci::use(*magnitudeIdentifier),
                 soci::use(magnitudeAlgorithm);
 
+    // Delete it to be sure
+    std::string deleteFromEventPrefMag{
+R"'''(
+DELETE FROM EventPrefMag WHERE evid = :evid AND magid = :magid;
+)'''"
+    };
+    *session << deleteFromEventPrefMag,
+                soci::use(eventIdentifier),
+                soci::use(*magnitudeIdentifier);
+
+/*
     // Delete the eventprefmag
     if (deletePrefMag)
     {
@@ -752,6 +796,7 @@ DELETE FROM eventprefmag WHERE magid = :magid;
         *session << deleteEventPrefMagQuery,
                     soci::use(*magnitudeIdentifier);
     }
+*/
 
     // Try to update the preferred magnitude.  This is the last
     // statement so commit it.
@@ -767,6 +812,16 @@ SELECT magpref.setPrefMagOfEventByPrefor(:evid, 1);
     }
     else
     {
+
+        std::string insertIntoEventPrefMag{
+R"""(
+INSERT INTO eventprefmag (evid, magid) VALUES (:evid, :magid) ON CONFLICT DO NOTHING;
+)"""
+        };
+        *session << insertIntoEventPrefMag,
+                    soci::use(eventIdentifier),
+                    soci::into(*currentPreferredMagnitudeIdentifier);
+
 /*
         int64_t returnedMagnitudeIdentifier;
         std::string setExistingPrefMag{
